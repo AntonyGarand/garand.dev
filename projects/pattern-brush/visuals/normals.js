@@ -1,4 +1,4 @@
-import bezier, { Vector } from '../Bezier.js';
+import bezier, { Vector } from '../bezier.js';
 const PROGRESS_POINT_COUNT = 10;
 const PROGRESS_POINT_DISTANCE = 1 / PROGRESS_POINT_COUNT;
 const LINE_LENGTH = 20;
