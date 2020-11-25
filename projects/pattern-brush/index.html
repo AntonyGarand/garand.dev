@@ -1,0 +1,127 @@
+<meta charset="utf-8">
+
+<style>
+    input[type=radio] {
+        display: none;
+    }
+
+    input[type=radio] + svg {
+        margin: 1px;
+        cursor: pointer;
+    }
+
+    input[type=radio]:checked + svg {
+        border: 1px solid lightgreen;
+        margin: 0;
+    }
+</style>
+
+<div class="svgContainer">
+    <label for="diagonalOption">
+        <input type="radio" id="diagonalOption" value="diagonal" name="currentSVG" checked="checked"/>
+        <svg id="diagonal" xmlns="http://www.w3.org/2000/svg" width="50" height="50"
+             style="overflow: visible"
+             viewBox="0 0 50 50">
+            <rect x="0" y="0" width="50" height="50" rx="0" ry="0"
+                  fill="#ede" stroke="#000" stroke-width="2"></rect>
+            <line x1="0" x2="50" y1="0" y2="50" fill="none" stroke="#000"></line>
+            <line x1="50" x2="0" y1="0" y2="50" fill="none" stroke="#000"></line>
+        </svg>
+    </label>
+
+    <label for="horizontalOption">
+        <input type="radio" id="horizontalOption" value="horizontal" name="currentSVG"/>
+        <svg id="horizontal" xmlns="http://www.w3.org/2000/svg" width="50" height="50"
+             style="overflow: visible"
+             viewBox="0 0 50 50">
+            <rect x="0" y="0" width="50" height="50" rx="0" ry="0"
+                  fill="#ede" stroke="#000" stroke-width="2"></rect>
+            <line x1="0" x2="50" y1="10" y2="10" fill="none" stroke="#000"></line>
+            <line x1="0" x2="50" y1="20" y2="20" fill="none" stroke="#000"></line>
+            <line x1="0" x2="50" y1="30" y2="30" fill="none" stroke="#000"></line>
+            <line x1="0" x2="50" y1="40" y2="40" fill="none" stroke="#000"></line>
+        </svg>
+    </label>
+
+    <label for="verticalOption">
+        <input type="radio" id="verticalOption" value="vertical" name="currentSVG"/>
+        <svg id="vertical" xmlns="http://www.w3.org/2000/svg" width="50" height="50"
+             style="overflow: visible"
+             viewBox="0 0 50 50">
+            <rect x="0" y="0" width="50" height="50" rx="0" ry="0"
+                  fill="#ede" stroke="#000" stroke-width="2"></rect>
+            <line x1="10" x2="10" y1="0" y2="50" fill="none" stroke="#000"></line>
+            <line x1="20" x2="20" y1="0" y2="50" fill="none" stroke="#000"></line>
+            <line x1="30" x2="30" y1="0" y2="50" fill="none" stroke="#000"></line>
+            <line x1="40" x2="40" y1="0" y2="50" fill="none" stroke="#000"></line>
+        </svg>
+    </label>
+</div>
+
+
+<svg width="100%" height="100%" id="canvas">
+    <style>
+        :root {
+            --p0Color: #e88178;
+            --p1Color: #97d5e8;
+            --p2Color: #98e890;
+            --p3Color: #e8aee4;
+
+            --point-to-point-color: #555;
+
+            --progress-color: #f00;
+        }
+
+        .point-wrapper {
+            cursor: pointer;
+        }
+    </style>
+
+    <pattern id="grid" width="10" height="10" patternunits="userSpaceOnUse">
+        <rect width="10" height="10" fill="#FFFFFF" stroke="#dddddd" stroke-width="1"></rect>
+    </pattern>
+
+    <!-- Grid background -->
+    <rect x="0" y="0" width="100%" height="100%" fill="url(#grid)"></rect>
+
+    <!-- Curve -->
+    <path d="M100,100 C300,100 100,300 300,300" id="bezier-curve" fill="none" stroke="black"></path>
+
+    <!-- Progress points -->
+    <g id="progress"></g>
+    <g id="derivatives"></g>
+    <g id="normals"></g>
+
+    <!-- Control points -->
+    <!-- Lines -->
+    <line id="p0-to-p1" x1="100" y1="100" x2="300" y2="100" stroke="var(--point-to-point-color)"
+          stroke-dasharray="4 2"></line>
+    <line id="p2-to-p3" x1="100" y1="300" x2="300" y2="300" stroke="var(--point-to-point-color)"
+          stroke-dasharray="4 2"></line>
+
+    <!-- Points -->
+    <g id="point-0" class="point-wrapper" transform="translate(100,100)">
+        <circle r="8" fill="rgba(0,0,0,0)" stroke="none"></circle>
+        <circle r="4" fill="var(--p0Color)" stroke="var(--p0Color)"></circle>
+        <circle r="8" fill="none" stroke="var(--p0Color)" stroke-width="2" stroke-dasharray="2"></circle>
+    </g>
+    <g id="point-1" class="point-wrapper" transform="translate(300,100)">
+        <circle r="8" fill="rgba(0,0,0,0)" stroke="none"></circle>
+        <circle r="4" fill="var(--p1Color)" stroke="var(--p1Color)"></circle>
+        <circle r="8" fill="none" stroke="var(--p1Color)" stroke-width="2" stroke-dasharray="2"></circle>
+    </g>
+    <g id="point-2" class="point-wrapper" transform="translate(100,300)">
+        <circle r="8" fill="rgba(0,0,0,0)" stroke="none"></circle>
+        <circle r="4" fill="var(--p2Color)" stroke="var(--p2Color)"></circle>
+        <circle r="8" fill="none" stroke="var(--p2Color)" stroke-width="2" stroke-dasharray="2"></circle>
+    </g>
+    <g id="point-3" class="point-wrapper" transform="translate(300,300)">
+        <circle r="8" fill="rgba(0,0,0,0)" stroke="none"></circle>
+        <circle r="4" fill="var(--p3Color)" stroke="var(--p3Color)"></circle>
+        <circle r="8" fill="none" stroke="var(--p3Color)" stroke-width="2" stroke-dasharray="2"></circle>
+    </g>
+
+</svg>
+
+<script src="https://cdn.jsdelivr.net/npm/warpjs@1.0.8/dist/warp.js"></script>
+<script src="./control.js" type="module"></script>

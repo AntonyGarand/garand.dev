@@ -1,0 +1,125 @@
+<section style="display: flex;">
+    <section style="padding-right: 8px">
+        <label for="blurSlider">
+            Blur: [<span id="blurValue">30</span>]
+        </label>
+        <br />
+        <label for="alphaMultiplier">
+            Alpha multiplier: [<span id="alphaMultiplierValue">32</span>]
+        </label>
+        <br />
+        <label for="alphaShift">
+            Alpha Shift: [<span id="alphaShiftValue">-16</span>]
+        </label>
+    </section>
+    <section>
+        <input type="range" min="0" max="100" value="30" id="blurSlider">
+        <br />
+        <input type="range" min="0" max="100" value="32" id="alphaMultiplierSlider">
+        <br />
+        <input type="range" min="-100" max="2" step="0.1" value="-16" id="alphaShiftSlider">
+    </section>
+
+</section>
+<svg height="90%" width="100%">
+    <defs>
+        <!-- Increasing the available area to avoid the blur being cut when reaching the edge -->
+        <filter id="blur" width="200%" x="-50%" height="200%" y="-50%">
+            <feGaussianBlur id="blurElement" in="SourceGraphic" stdDeviation="30" result="blur" />
+        </filter>
+
+        <filter id="colormatrix" width="200%" x="-50%" height="200%" y="-50%">
+            <!--
+                The colormatrix has two important values, the two last ones.
+                There are two operations being performed here:
+                 1. The penultimate value
+                    This one multiplies the opacity (alpha) by its value
+                    It therefore makes the overall result "more" visible
+                    For metaballs purpose, it controls the "size" and "rec"
+                 2. The last value
+                    This ones is the opposite of the previous one: It shifts the value by the amount specified
+                    It's a left shift (<<) when the value is negative, and right shift (>>) when positive 
+                    It is used to "remove" the regions with an opacity below a threshold after the multipler
+
+                Note that unlike "real" alpha values, the values in this matrix can go beyond and under "100%", which is why such numbers are used. 
+            -->
+            <feColorMatrix id="colorMatrixElement" in="blur" mode="matrix" values="1 0 0 0  0
+                                                                                   0 1 0 0  0
+                                                                                   0 0 1 0  0
+                                                                                   0 0 0 32 -16" result="matrix" />
+
+            <!--   -->
+            <feComposite in="SourceGraphic" in2="matrix" operator="atop" />
+        </filter>
+    </defs>
+    <g filter="url(#colormatrix)">
+        <circle cx="400" cy="400" r="90" fill="red" filter="url(#blur)" />
+        <circle cx="500" cy="400" r="90" fill="red" filter="url(#blur)" />
+        <circle cx="600" cy="400" r="90" fill="red" filter="url(#blur)" />
+        <circle cx="700" cy="400" r="90" fill="red" filter="url(#blur)" />
+    </g>
+</svg>
+
+<script>
+    let $ = document.querySelector.bind(document);
+    let $$ = document.querySelectorAll.bind(document);
+
+    // Moving the circles using the mouse
+    let isMoving = false;
+    const offset = { x: 0, y: 0 };
+    $$("circle").forEach(circle => {
+        circle.addEventListener("mousedown", (e) => {
+            isMoving = circle;
+            offset.x = e.clientX - circle.attributes.cx.value;
+            offset.y = e.clientY - circle.attributes.cy.value;
+        })
+    });
+    const svg = $("svg");
+    svg.addEventListener("mousemove", (e) => {
+        if (!isMoving) return;
+
+        const newPosition = {
+            x: e.clientX - offset.x,
+            y: e.clientY - offset.y
+        }
+        isMoving.setAttribute('cx', newPosition.x);
+        isMoving.setAttribute('cy', newPosition.y);
+    })
+    svg.addEventListener("mouseup", () => isMoving = false)
+    // Modifying the values on the fly
+
+    const values = {
+        blur: 20,
+        alphaMultiplier: 32,
+        alphaShift: -16,
+    }
+
+    const addSliderListener = (name) => $(`#${name}Slider`).addEventListener('input', e => {
+        const newValue = e.target.value;
+        $(`#${name}Value`).innerText = newValue;
+        values[name] = newValue;
+        updateSVG();
+    });
+
+    addSliderListener('blur');
+    addSliderListener('alphaMultiplier');
+    addSliderListener('alphaShift');
+
+    const svgBlurElement = $("#blurElement");
+    const svgColorMatrixElement = $("#colorMatrixElement");
+
+    const colorMatrixValue = new Array(20).fill(0);
+    // Making an identity matrix
+    colorMatrixValue[0] = 1;
+    colorMatrixValue[6] = 1;
+    colorMatrixValue[12] = 1;
+    colorMatrixValue[18] = 1;
+
+    function updateSVG() {
+        svgBlurElement.setAttribute('stdDeviation', values.blur);
+        colorMatrixValue[18] = values.alphaMultiplier;
+        colorMatrixValue[19] = values.alphaShift;
+        svgColorMatrixElement.setAttribute('values', colorMatrixValue.join(' '));
+    }
+
+</script>
