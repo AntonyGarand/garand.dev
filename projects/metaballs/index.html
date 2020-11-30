@@ -10,19 +10,22 @@
         </label>
         <br />
         <label for="alphaMultiplier">
-            Alpha multiplier: [<span id="alphaMultiplierValue">32</span>]
+            Alpha multiplier: [<span id="alphaMultiplierValue">25</span>]
         </label>
         <br />
         <label for="alphaShift">
-            Alpha Shift: [<span id="alphaShiftValue">-16</span>]
+            Alpha Shift: [<span id="alphaShiftValue">-15</span>]
         </label>
     </section>
     <section>
         <input type="range" min="0" max="100" value="20" id="blurSlider" autocomplete="off" />
         <br />
-        <input type="range" min="0" max="100" value="32" id="alphaMultiplierSlider" autocomplete="off" />
+        <input type="range" min="0" max="255" value="25" id="alphaMultiplierSlider" autocomplete="off" />
         <br />
-        <input type="range" min="-100" max="1" step="0.1" value="-16" id="alphaShiftSlider" autocomplete="off" />
+        <input type="range" min="-154" max="1" step="0.1" value="-15" id="alphaShiftSlider" autocomplete="off" />
+    </section>
+    <section>
+        <button onclick="toggle()">Toggle atop</button>
     </section>
 </section>
 <svg height="90%" width="100%">
@@ -39,21 +42,14 @@
                 There are two operations being performed here:
                  1. The penultimate value
                     This one multiplies the opacity (alpha) by its value
-                    It therefore makes the overall result "more" visible
-                    For metaballs purpose, it controls the "size" and "rec"
+                    It therefore makes the overall result "more" visible.
                  2. The last value
-                    This ones is the opposite of the previous one: It shifts the value by the amount specified
-                    It's a left shift (<<) when the value is negative, and right shift (>>) when positive 
-                    It is used to "remove" the regions with an opacity below a threshold after the multipler
-
-                Note that unlike "real" alpha values, the values in this matrix can go beyond and under "100%", which is why such numbers are used. 
+                    This value is added (+) to the result, as 100% per unit.
             -->
             <feColorMatrix id="colorMatrixElement" in="blur" mode="matrix" values="1 0 0 0  0
                                                                                    0 1 0 0  0
                                                                                    0 0 1 0  0
-                                                                                   0 0 0 32 -16" result="matrix" />
-
-            <feComposite in="SourceGraphic" in2="matrix" operator="atop" />
+                                                                                   0 0 0 25 -15" result="matrix" />
         </filter>
     </defs>
     <g filter="url(#gooify)">
@@ -94,8 +90,8 @@
 
     const values = {
         blur: 20,
-        alphaMultiplier: 32,
-        alphaShift: -16,
+        alphaMultiplier: 25,
+        alphaShift: -15,
     }
 
     function addSliderListener(name) {
@@ -127,4 +123,8 @@
         colorMatrixValue[19] = values.alphaShift;
         svgColorMatrixElement.setAttribute('values', colorMatrixValue.join(' '));
     }
+
+
+    // Calling this once to sync the values of `values` and the slider / color matrix
+    updateSVG();
 </script>
