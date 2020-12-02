@@ -1,0 +1,248 @@
+<style>
+    svg circle {
+        cursor: pointer;
+    }
+</style>
+<section style="display: flex;">
+    <section style="padding-right: 8px">
+        <label for="blurSlider">
+            Blur: [<span id="blurValue">30</span>]
+        </label>
+        <br />
+        <label for="alphaMultiplierSlider">
+            Alpha multiplier: [<span id="alphaMultiplierValue">25</span>]
+        </label>
+        <br />
+        <label for="alphaShiftSlider">
+            Alpha Shift: [<span id="alphaShiftValue">-15</span>]
+        </label>
+        <br />
+        <label for="fleeDistanceSlider">
+            Flee Distance: [<span id="fleeDistanceValue">200</span>]
+        </label>
+        <br />
+        <label for="fleeSpeedSlider">
+            Flee speed: [<span id="fleeSpeedValue">20</span>]
+        </label>
+        <br />
+        <label for="fleeResistanceSlider">
+            Flee resistance: [<span id="fleeResistanceValue">2</span>]
+        </label>
+    </section>
+    <section>
+        <input type="range" min="0" max="100" value="20" id="blurSlider" autocomplete="off" />
+        <br />
+        <input type="range" min="0" max="255" value="25" id="alphaMultiplierSlider" autocomplete="off" />
+        <br />
+        <input type="range" min="-154" max="1" step="0.1" value="-15" id="alphaShiftSlider" autocomplete="off" />
+        <br />
+        <input type="range" min="0" max="100" value="200" id="fleeDistanceSlider" autocomplete="off" />
+        <br />
+        <input type="range" min="0" max="50" value="20" id="fleeSpeedSlider" autocomplete="off" />
+        <br />
+        <input type="range" min="0" max="50" value="2" id="fleeResistanceSlider" autocomplete="off" />
+        <br /><button onclick="stop = true">Stop</button>
+    </section>
+</section>
+<svg height="90%" width="100%">
+    <defs>
+        <!-- Increasing the available area to avoid the blur being cut when reaching the edge -->
+        <filter id="gooify" width="400%" x="-150%" height="400%" y="-150%">
+            <!-- 
+                The blur value controls the "reach" of the elements. 
+                It is also the biggest performance hit, so don't crank it too high! 
+            -->
+            <feGaussianBlur id="blurElement" in="SourceGraphic" stdDeviation="20" result="blur" />
+            <!--
+                The colormatrix has two important values, the two last ones.
+                There are two operations being performed here:
+                 1. The penultimate value
+                    This one multiplies the opacity (alpha) by its value
+                    It therefore makes the overall result "more" visible.
+                 2. The last value
+                    This value is added (+) to the result, as 100% per unit.
+            -->
+            <feColorMatrix id="colorMatrixElement" in="blur" mode="matrix" values="1 0 0 0  0
+                                                                                   0 1 0 0  0
+                                                                                   0 0 1 0  0
+                                                                                   0 0 0 25 -15" result="matrix" />
+
+        </filter>
+        <filter id="add-image-1" width="600" height="400">
+
+        </filter>
+    </defs>
+    <g filter="url(#gooify)" id="image2-blob">
+        <circle cx="200" cy="200" r="90" fill="blue" />
+        <circle cx="300" cy="200" r="70" fill="blue" />
+        <circle cx="400" cy="200" r="80" fill="blue" />
+        <circle cx="500" cy="200" r="60" fill="blue" />
+        <circle cx="200" cy="300" r="70" fill="blue" />
+        <circle cx="300" cy="300" r="40" fill="blue" />
+        <circle cx="400" cy="300" r="99" fill="blue" />
+        <circle cx="500" cy="300" r="49" fill="blue" />
+        <circle cx="200" cy="400" r="80" fill="blue" />
+        <circle cx="300" cy="400" r="70" fill="blue" />
+        <circle cx="400" cy="400" r="80" fill="blue" />
+        <circle cx="500" cy="400" r="90" fill="blue" />
+    </g>
+    <mask id="image1-mask">
+        <g filter="url(#gooify)" id="image1-blob">
+            <circle cx="200" cy="200" r="90" fill="white" />
+            <circle cx="300" cy="200" r="70" fill="white" />
+            <circle cx="400" cy="200" r="80" fill="white" />
+            <circle cx="500" cy="200" r="60" fill="white" />
+            <circle cx="200" cy="300" r="70" fill="white" />
+            <circle cx="300" cy="300" r="40" fill="white" />
+            <circle cx="400" cy="300" r="99" fill="white" />
+            <circle cx="500" cy="300" r="49" fill="white" />
+            <circle cx="200" cy="400" r="80" fill="white" />
+            <circle cx="300" cy="400" r="70" fill="white" />
+            <circle cx="400" cy="400" r="80" fill="white" />
+            <circle cx="500" cy="400" r="90" fill="white" />
+        </g>
+    </mask>
+    <image href="https://placekitten.com/1000/800" mask="url(#image1-mask)"/>
+</svg>
+
+<script>
+    const $ = document.querySelector.bind(document);
+    const $$ = document.querySelectorAll.bind(document);
+
+    const values = {
+        blur: 20,
+        alphaMultiplier: 25,
+        alphaShift: -15,
+        fleeDistance: 300,
+        fleeSpeed: 0.7,
+        fleeResistance: 0.0003,
+    }
+
+    // Circles fleeing
+    const svg = $("svg");
+
+    let activeCircles = Array.from($$("#image1-blob > circle"));
+    let meta = new Map();
+    activeCircles.forEach(c => meta.set(c, { x: 0, y: 0, speed: 0 }))
+
+    svg.addEventListener("mousemove", (e) => {
+        const pos = realPosition(e);
+        // Set the unit vector for each circle, and speed based off distance
+        activeCircles.forEach(circle => {
+            const distance = findDistance(circle, pos);
+            if (distance > values.fleeDistance) {
+                return;
+            }
+
+            const direction = unitVector(circle, pos, distance);
+            const speed = Math.max(values.fleeSpeed / 5, (1 - (distance / values.fleeDistance)) * values.fleeSpeed);
+
+            meta.set(circle, {
+                x: -direction.x,
+                y: -direction.y,
+                speed
+            })
+        })
+    })
+
+    function findDistance(circle, mouse) {
+        const distX = Math.abs(mouse.x - circle.attributes.cx.value);
+        const distY = Math.abs(mouse.y - circle.attributes.cy.value);
+
+        const dist = Math.sqrt(distX * distX + distY * distY);
+        return dist;
+    }
+
+    function unitVector(circle, mouse, dist) {
+        const distX = mouse.x - circle.attributes.cx.value;
+        const distY = mouse.y - circle.attributes.cy.value;
+
+        return {
+            x: distX / dist,
+            y: distY / dist
+        }
+    }
+
+    function realPosition(mouse) {
+        var rect = svg.getBoundingClientRect();
+        var x = mouse.clientX - rect.left;
+        var y = mouse.clientY - rect.top;
+        return { x, y };
+    }
+
+    // Animating the circles
+    let latest = 0;
+
+    var stop = false;
+    function step(timestamp) {
+        if (latest === 0) {
+            latest = timestamp;
+        }
+
+        const delta = timestamp - latest;
+        activeCircles
+            .forEach(circle => {
+                const circleValues = meta.get(circle);
+                if (circleValues.speed < 0.002) {
+                    return;
+                }
+                const distanceToDo = circleValues.speed * delta;
+
+                const movement = {
+                    x: circleValues.x * distanceToDo,
+                    y: circleValues.y * distanceToDo
+                }
+                const newPosition = {
+                    x: movement.x + Number(circle.attributes.cx.value),
+                    y: movement.y + Number(circle.attributes.cy.value),
+                }
+
+                circle.setAttribute('cx', newPosition.x);
+                circle.setAttribute('cy', newPosition.y);
+
+                circleValues.speed -= values.fleeResistance * delta;
+            })
+
+        animationFrame = stop || window.requestAnimationFrame(step);
+        latest = timestamp;
+    }
+
+    let animationFrame = window.requestAnimationFrame(step);
+
+    // Slider controls
+    function addSliderListener(name) {
+        $(`#${name}Slider`).addEventListener('input', e => {
+            const newValue = e.target.value;
+            $(`#${name}Value`).innerText = newValue;
+            values[name] = newValue;
+            updateSVG();
+        });
+    }
+
+    addSliderListener('blur');
+    addSliderListener('alphaMultiplier');
+    addSliderListener('alphaShift');
+    addSliderListener('fleeSpeed');
+    addSliderListener('fleeResistance');
+
+    const svgBlurElement = $("#blurElement");
+    const svgColorMatrixElement = $("#colorMatrixElement");
+
+    const colorMatrixValue = new Array(20).fill(0);
+    // Making an identity matrix
+    colorMatrixValue[0] = 1;
+    colorMatrixValue[6] = 1;
+    colorMatrixValue[12] = 1;
+    colorMatrixValue[18] = 1;
+
+    function updateSVG() {
+        svgBlurElement.setAttribute('stdDeviation', values.blur);
+        colorMatrixValue[18] = values.alphaMultiplier;
+        colorMatrixValue[19] = values.alphaShift;
+        svgColorMatrixElement.setAttribute('values', colorMatrixValue.join(' '));
+    }
+
+
+    // Calling this once to sync the values of `values` and the slider / color matrix
+    updateSVG();
+</script>
