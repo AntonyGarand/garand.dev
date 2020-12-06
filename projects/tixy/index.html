@@ -401,6 +401,10 @@
             input.value = newCode;
             updateCommentsForCode();
             updateCallback();
+
+            history.replaceState({
+              code: newCode,
+            }, code, `?code=${encodeURIComponent(newCode)}`);
         }
 
         function pickRandom(arr) {
