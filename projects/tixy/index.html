@@ -152,6 +152,38 @@
             "input is limited \nto 32 characters!": "(x-5)**2 + (y-5)**2 - 99*sin(t)",
             "click here to \ncreate your own": "'HAVE FUN!'"
         };
+
+        const examples2 = ['((x^y)%2?sin:cos)(t)',
+            'y-t*3+9+3*cos(x*3-t)-5*sin(x*7)',
+            '-.4 /(hypot(x-t%10,y-t%8)-t%2*9)',
+            '1/32*tan(t/64*x*tan(i-x))',
+            '1-(sin((x&28+y&12)+t)>0?y:x)%4',
+            'sin(t-hypot(x-7.5,y-6))',
+            '4/((x-t*0.7)**2+(y-t)**2)-y/t/2',
+            'min(10-y+sin(x+sin(y+t*4))*5,0)',
+            '1-abs((x-6)*cos(t)+(y-6)*sin(t))',
+            'sin(t+((x-7.5)**2+(y-7.5)**2)/4)',
+            '(x^y)-i/t**1.8',
+            '-hypot(x-t%6*3,(t*5%8-4)**2-y)+2',
+            '[z=t-x,tan(y-z),-z/y,y-x%t][t&3]',
+            'tan(-y/max(x-8,y-8,7-x,7-y)-t*4)',
+            'sin(-t/hypot(x-7.5,y-7.5))',
+            'a=tan(t),((t*9+x-y*a^x*a+y)&8)-4',
+            '6-hypot(x-7.5,y-7.5)-sin(i/3-t)',
+            '.025/sin(t+(x^y|t))+t+i*6):.3',
+            'x>6|y>5?y<12&&sin(y+t+i*6):.3',
+            '[5463,2194,2386][y+t*9&7]&1<<x-1',
+            '1-((x*x-y+t*(1+x*x%5)*3)%16)/16',
+            '(((x-8)/y+t*5)&1^1/y*8&1)*y/5',
+            '(x+(t*10)/16)&y+(t*10)',
+            'd=y*y%5.9+1,!((x+t*50/d)&15)/d',
+            '"p}¶¼<¼¶}p".charCodeAt(x)&2**y',
+            'hypot(x-=t%2*9,y-=8)<6&&x<y|y<-x',
+            'x&y<9&y>4+sin(8*t+x*x)+x/4',
+            '([62,85,93,62][y/2]||65)>>x%9&1',
+            't/y<(x+=t*24,(y+x^y-x)%29+y*2)',
+        ]
+
         const count = 16;
         const size = 16;
         const spacing = 1;
@@ -345,7 +377,7 @@
         function nextRandom() {
             const sampleCount = ~~(Math.random() * 8) + 2
             const samples = new Array(sampleCount).fill(0).map(
-                () => examples[keys[~~(Math.random() * keys.length)]]
+                () => Math.random()<0.5?examples[keys[~~(Math.random() * keys.length)]]:pickRandom(examples2)
             );
 
             const splitTypes = [
