@@ -1,0 +1,391 @@
+<!doctype html>
+<html>
+
+<head>
+    <meta name="viewport" content="width=400, user-scalable=no">
+    <meta name="theme-color" content="#000000">
+    <title>(t,i,x,y) => "creative code golfing"</title>
+    <meta name="description"
+        content="A minimalist coding environment. Control 16x16 points with a single JavaScript function.">
+    <style>
+        html {
+            background-color: #000;
+            color: #fff;
+            height: 100%
+        }
+
+        * {
+            box-sizing: border-box
+        }
+
+        a:link,
+        a:visited {
+            color: #f24
+        }
+
+        *,
+        html,
+        input {
+            font-family: monospace;
+            font-size: 14px
+        }
+
+        body {
+            padding: 0;
+            margin: 0;
+            display: grid;
+            align-items: center;
+            justify-items: center;
+            height: 100%
+        }
+
+        #editor,
+        #editor.over-limit.focus label.limit-warning,
+        #output,
+        input,
+        label {
+            display: block
+        }
+
+        #editor {
+            width: 271px;
+            line-height: 1.15em
+        }
+
+        #editor #input {
+            background: 0 0;
+            color: #fff;
+            padding: 0;
+            margin: .15em 0;
+            border: 0;
+            width: 100%
+        }
+
+        #editor #input:focus {
+            outline: 0
+        }
+
+        #code-runner,
+        #editor label.limit-warning,
+        #editor.over-limit.focus label.second {
+            display: none
+        }
+
+        #editor #comment {
+            color: #f24
+        }
+
+        #editor.over-limit #input {
+            background: #f24;
+            color: #fff
+        }
+    </style>
+    <link rel="icon" type="image/png" href="/favicon.9fed2980.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.b9a24498.png">
+    <link rel="icon" type="image/png" sizes="512x512" href="/android-chrome-512x512.e49c1300.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="/android-chrome-192x192.b729a878.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.76100e1a.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.3b2b8e5e.png">
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:site" content="@aemkei">
+    <meta name="twitter:title" content="(t,i,x,y) => 'creative code golfing'">
+    <meta name="twitter:description"
+        content="A minimalist coding environment. Control 16x16 points with a single JavaScript function. By @aemkei">
+    <meta name="twitter:image" content="https://tixy.land/assets/twitter-card.png">
+</head>
+
+<body> <canvas id="output"></canvas>
+    <form id="editor">
+        <div id="comment"> <label class="first" for="input">// tixy - creative code golfing</label> <label
+                class="second" for="input">// click the dots for more info</label> <label class="limit-warning"
+                for="input">// use 32 characters or less</label> </div> <label id="label" for="input">(t,i,x,y)
+            =></label> <input name="code" id="input" type="text" value="Math.sin(y/8+t)" autocomplete="off"
+            autocapitalize="off" spellcheck="false" autocorrect="off" enterkeyhint="go">
+    </form>
+    <script src="./jscodeshift.min.js"></script>
+    <script>
+        const examples = {
+            "for every dot return 0 or 1 \nto change the visibility": "Math.random() < 0.1",
+            "use a float between 0 and 1\n to define the size": "Math.random()",
+            "parameter `t` is \nthe time in seconds": "Math.sin(t)",
+            "param `i` is the index \nof the dot (0..255)": "i / 256",
+            "`x` is the column index\n from 0 to 15": "x / 16",
+            "`y` is the row\n also from 0 to 15": "y / 16",
+            "positive numbers are white,\nnegatives are red": "y - 7.5",
+            "use the time\nto animate values": "y - t",
+            "multiply the time\nto change the speed": "y - t*4",
+            "create patterns using \ndifferent color": "[1, 0, -1][i%3]",
+            "skip `Math.` to use methods \nand props like `sin` or `PI`": "sin(t-sqrt((x-7.5)**2+(y-6)**2))",
+            "more examples ...": "sin(y/8 + t)",
+            "simple triangle": "y - x",
+            "quarter triangle": "(y > x) && (14-x < y)",
+            "pattern": "i%4 - y%4",
+            "grid": "x%4 && y%4",
+            "square": "x>3 & y>3 & x<12 & y<12",
+            "animated square": "-(x>t & y>t & x<15-t & y<15-t)",
+            "mondrian squares": "(y-6) * (x-6)",
+            "moving cross": "(y-4*t|0) * (x-2-t|0)",
+            "sierpinski": "4 * t & i & x & y",
+            "binary clock": "(t*10) & (1<<x) && y==8",
+            "random noise": "random() * 2 - 1",
+            "static smooth noise": "sin(i ** 2)",
+            "animated smooth noise": "cos(t + i + x * y)",
+            "waves": "sin(x/2) - sin(x-t) - y+6",
+            "bloop bloop bloop\nby @v21": "(x-8)*(y-8) - sin(t)*64",
+            "fireworks\nby @p_malin and @aemkei": "-.4/(hypot(x-t%10,y-t%8)-t%2*9)",
+            "ripples\nby @thespite": "Math.sin(t-Math.sqrt(x*x+y*y))",
+            "scrolling TIXY font\nby @atesgoral": "[5463,2194,2386][y+t*9&7]&1<<x-1",
+            "3d checker board\nby @p_malin": "(((x-8)/y+t*5)&1^1/y*8&1)*y/5",
+            "sticky blood\nby @joeytwiddle": "y-t*3+9+3*cos(x*3-t)-5*sin(x*7)",
+            "3d starfield\nby @p_malin": "d=y*y%5.9+1,!((x+t*50/d)&15)/d",
+            "dialogue with an alien\nby @chiptune": "1/32*tan(t/64*x*tan(i-x))",
+            "space invader\nby @keithclarkcouk + @zozuar": "'p}¶¼<¼¶}p'.charCodeAt(x)&2**y",
+            "hungry pac man\nby @p_malin and @aemkei": "hypot(x-=t%4*5,y-=8)<6&&x<y|y<-x",
+            "spectrum analyser\nby @joeytwiddle": "x&y<9&y>4+sin(8*t+x*x)+x/4",
+            "diagonals": "y == x || -(15-x == y)",
+            "frame": "x==0 | x==15 | y==0 | y==15",
+            "drop": "8*t%13 - hypot(x-7.5, y-7.5)",
+            "rotation": "sin(2*atan((y-7.5)/(x-7.5))+5*t)",
+            "wipe": "(x-y) - sin(t) * 16",
+            "soft wipe": "(x-y)/24 - sin(t)",
+            "disco": "sin(t*5) * tan(t*7)",
+            "input is limited \nto 32 characters!": "(x-5)**2 + (y-5)**2 - 99*sin(t)",
+            "click here to \ncreate your own": "'HAVE FUN!'"
+        };
+        const count = 16;
+        const size = 16;
+        const spacing = 1;
+        const width = count * (size + spacing) - spacing;
+
+
+        const input = document.getElementById('input');
+        const editor = document.getElementById('editor');
+        const comment = document.getElementById('comment');
+        const output = document.getElementById('output');
+        const context = output.getContext('2d');
+        const dpr = window.devicePixelRatio || 1;
+
+        let callback = function () { };
+        let startTime = null;
+        let code = '';
+
+        output.width = output.height = width * dpr;
+        context.scale(dpr, dpr);
+        output.style.width = output.style.height = `${width}px`;
+
+        function readURL() {
+            const url = new URL(document.location);
+
+            if (url.searchParams.has('code')) {
+                input.value = url.searchParams.get('code');
+            }
+        }
+
+        readURL();
+
+        function checkLength() {
+            if (code.length > 32) {
+                editor.classList.add('over-limit');
+            } else {
+                editor.classList.remove('over-limit');
+            }
+        }
+
+        function updateCallback() {
+            code = input.value;
+            startTime = null;
+
+            checkLength();
+
+            try {
+                callback = new Function('t', 'i', 'x', 'y', `
+                    try {
+                        with (Math) {
+                        return ${code};
+                        }
+                    } catch (error) {
+                        return error;
+                    }`);
+            } catch (error) {
+                callback = null;
+            }
+        }
+
+        input.addEventListener('input', updateCallback);
+        updateCallback();
+
+        input.addEventListener('focus', function () {
+            editor.classList.add('focus');
+            updateComments([
+                'hit "enter" to save in URL',
+                'or get <a href="https://twitter.com/aemkei/status/1323399877611708416">more info here</a>'
+            ]);
+        });
+
+        input.addEventListener('blur', function () {
+            updateCommentsForCode();
+            editor.classList.remove('focus');
+        });
+
+        editor.addEventListener('submit', (event) => {
+            event.preventDefault();
+            const url = new URL(document.location);
+            url.searchParams.set('code', code);
+            history.replaceState(null, code, url);
+        });
+
+        function render() {
+            let time = 0;
+
+            if (startTime) {
+                time = (new Date() - startTime) / 1000;
+            } else {
+                startTime = new Date();
+            }
+
+            if (!callback) {
+                window.requestAnimationFrame(render);
+                return;
+            }
+
+            output.width = output.height = width * dpr;
+            context.scale(dpr, dpr);
+            let index = 0;
+            for (let y = 0; y < count; y++) {
+                for (let x = 0; x < count; x++) {
+                    const value = Number(callback(time, index, x, y));
+                    const offset = size / 2;
+                    let color = '#FFF';
+                    let radius = (value * size) / 2;
+
+                    if (radius < 0) {
+                        radius = -radius;
+                        color = '#F24';
+                    }
+
+                    if (radius > size / 2) {
+                        radius = size / 2;
+                    }
+
+                    context.beginPath();
+                    context.fillStyle = color;
+                    context.arc(
+                        x * (size + spacing) + offset,
+                        y * (size + spacing) + offset,
+                        radius,
+                        0,
+                        2 * Math.PI
+                    );
+                    context.fill();
+                    index++;
+                }
+            }
+
+            window.requestAnimationFrame(render);
+        }
+
+        render();
+
+        function updateComments(comments) {
+            const lines = comment.querySelectorAll('label');
+
+            if (comments.length === 1) {
+                lines[0].innerHTML = '&nbsp;';
+                lines[1].innerHTML = `// ${comments[0]}`;
+            } else {
+                lines[0].innerHTML = `// ${comments[0]}`;
+                lines[1].innerHTML = `// ${comments[1]}`;
+            }
+        }
+
+        function updateCommentsForCode() {
+            const code = input.value;
+
+            const snippets = Object.values(examples);
+            const comments = Object.keys(examples);
+            const index = snippets.indexOf(code);
+            const newComment = comments[index];
+
+            if (!newComment) {
+                return;
+            }
+
+            const newComments = newComment.split('\n');
+
+            updateComments(newComments);
+        }
+
+        function nextExample() {
+            const snippets = Object.values(examples);
+
+            let index = snippets.indexOf(code);
+
+            if (snippets[index + 1]) {
+                index = index + 1;
+            } else {
+                return;
+            }
+
+            const newCode = snippets[index];
+            input.value = newCode;
+
+            updateCommentsForCode();
+
+            // history.replaceState({
+            //   code: newCode,
+            //   comment: newComment
+            // }, code, `?code=${encodeURIComponent(newCode)}`);
+
+            updateCallback();
+        }
+
+        // Custom starts here
+        const keys = Object.keys(examples);
+        const j = jscodeshift;
+        function nextRandom() {
+            const sampleCount = ~~(Math.random() * 8) + 2
+            const samples = new Array(sampleCount).fill(0).map(
+                () => examples[keys[~~(Math.random() * keys.length)]]
+            );
+
+            const splitTypes = [
+                j.BinaryExpression,
+                j.CallExpression
+            ];
+
+            const fragments = samples.map(sample => {
+                const available = [];
+                const jsc = j(sample);
+                splitTypes.forEach(type => jsc.find(type).forEach(v => available.push(v)));
+                return pickRandom(available);
+            }).map(f => j(f).toSource());
+
+            console.debug(fragments);
+            const newCode = fragments.reduce((acc, v) => {
+                const delimiters = ['+', '-', '*', '%', '|', '<<', '>>', '%', '^'];
+                return (acc ? acc + pickRandom(delimiters) : '') + v;
+            }, '');
+
+
+            input.value = newCode;
+            updateCommentsForCode();
+            updateCallback();
+        }
+
+        function pickRandom(arr) {
+            return arr[~~(Math.random() * arr.length)];
+        }
+
+        output.addEventListener('click', nextRandom);
+        // Ends here
+
+        window.onpopstate = function (event) {
+            readURL();
+            updateCallback();
+        };
+
+        updateCommentsForCode();
+    </script>
+</body>
+
+</html>
