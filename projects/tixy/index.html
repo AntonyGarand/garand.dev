@@ -360,7 +360,6 @@
                 return pickRandom(available);
             }).map(f => j(f).toSource());
 
-            console.debug(fragments);
             const newCode = fragments.reduce((acc, v) => {
                 const delimiters = ['+', '-', '*', '%', '|', '<<', '>>', '%', '^'];
                 return (acc ? acc + pickRandom(delimiters) : '') + v;
