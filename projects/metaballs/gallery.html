@@ -68,26 +68,9 @@
                                                                                    0 0 0 25 -15" result="matrix" />
 
         </filter>
-        <filter id="add-image-1" width="600" height="400">
-
-        </filter>
     </defs>
-    <g filter="url(#gooify)" id="image2-blob">
-        <circle cx="200" cy="200" r="90" fill="blue" />
-        <circle cx="300" cy="200" r="70" fill="blue" />
-        <circle cx="400" cy="200" r="80" fill="blue" />
-        <circle cx="500" cy="200" r="60" fill="blue" />
-        <circle cx="200" cy="300" r="70" fill="blue" />
-        <circle cx="300" cy="300" r="40" fill="blue" />
-        <circle cx="400" cy="300" r="99" fill="blue" />
-        <circle cx="500" cy="300" r="49" fill="blue" />
-        <circle cx="200" cy="400" r="80" fill="blue" />
-        <circle cx="300" cy="400" r="70" fill="blue" />
-        <circle cx="400" cy="400" r="80" fill="blue" />
-        <circle cx="500" cy="400" r="90" fill="blue" />
-    </g>
-    <mask id="image1-mask">
-        <g filter="url(#gooify)" id="image1-blob">
+    <mask id="background-mask">
+        <g filter="url(#gooify)" id="image2-blob">
             <circle cx="200" cy="200" r="90" fill="white" />
             <circle cx="300" cy="200" r="70" fill="white" />
             <circle cx="400" cy="200" r="80" fill="white" />
@@ -102,7 +85,24 @@
             <circle cx="500" cy="400" r="90" fill="white" />
         </g>
     </mask>
-    <image href="https://placekitten.com/1000/800" mask="url(#image1-mask)"/>
+    <mask id="foreground-mask">
+        <g filter="url(#gooify)" id="foreground-blob">
+            <circle cx="200" cy="200" r="90" fill="white" />
+            <circle cx="300" cy="200" r="70" fill="white" />
+            <circle cx="400" cy="200" r="80" fill="white" />
+            <circle cx="500" cy="200" r="60" fill="white" />
+            <circle cx="200" cy="300" r="70" fill="white" />
+            <circle cx="300" cy="300" r="40" fill="white" />
+            <circle cx="400" cy="300" r="99" fill="white" />
+            <circle cx="500" cy="300" r="49" fill="white" />
+            <circle cx="200" cy="400" r="80" fill="white" />
+            <circle cx="300" cy="400" r="70" fill="white" />
+            <circle cx="400" cy="400" r="80" fill="white" />
+            <circle cx="500" cy="400" r="90" fill="white" />
+        </g>
+    </mask>
+    <image href="https://placekitten.com/1001/800" id="background-image" mask="url(#background-mask)" />
+    <image href="https://placekitten.com/1000/800" id="foreground-image" mask="url(#foreground-mask)" />
 </svg>
 
 <script>
@@ -116,12 +116,13 @@
         fleeDistance: 300,
         fleeSpeed: 0.7,
         fleeResistance: 0.0003,
+        fadeDuration: 1500,
     }
 
     // Circles fleeing
     const svg = $("svg");
 
-    let activeCircles = Array.from($$("#image1-blob > circle"));
+    let activeCircles = Array.from($$("#foreground-blob > circle"));
     let meta = new Map();
     activeCircles.forEach(c => meta.set(c, { x: 0, y: 0, speed: 0 }))
 
@@ -172,20 +173,44 @@
 
     // Animating the circles
     let latest = 0;
+    let lastMovement = 0;
+    let fadeStart = 0;
 
-    var stop = false;
+    let stop = false;
     function step(timestamp) {
         if (latest === 0) {
             latest = timestamp;
         }
 
         const delta = timestamp - latest;
+        // Circle movements as needed
+        if (moveMetaballs(delta)) {
+            lastMovement = timestamp;
+        }
+
+        // Always continue the `fade` if it was started
+        // Otherwise, start it if the last movement was over 1s ago
+        if (fadeStart || lastMovement && timestamp - lastMovement > 1000) {
+            if (!fadeStart) {
+                fadeStart = timestamp;
+            }
+            fadeImage(timestamp);
+        }
+
+        animationFrame = stop || window.requestAnimationFrame(step);
+        latest = timestamp;
+    }
+    let animationFrame = window.requestAnimationFrame(step);
+
+    function moveMetaballs(delta) {
+        let hadMovement = false;
         activeCircles
             .forEach(circle => {
                 const circleValues = meta.get(circle);
                 if (circleValues.speed < 0.002) {
                     return;
                 }
+                hadMovement = true;
                 const distanceToDo = circleValues.speed * delta;
 
                 const movement = {
@@ -202,12 +227,61 @@
 
                 circleValues.speed -= values.fleeResistance * delta;
             })
-
-        animationFrame = stop || window.requestAnimationFrame(step);
-        latest = timestamp;
+        return hadMovement;
     }
 
-    let animationFrame = window.requestAnimationFrame(step);
+    // Fade and swapping logic
+    const imageSources = [
+        'https://placekitten.com/1000/800',
+        'https://placekitten.com/1001/800',
+        'https://placekitten.com/1002/800',
+        'https://placekitten.com/1003/800',
+        'https://placekitten.com/1004/800',
+        'https://placekitten.com/1005/800',
+    ]
+    let currentImageIndex = 0;
+
+    let foregroundImage = $("#foreground-image")
+    let backgroundImage = $("#background-image")
+    const blankBlobState = $("#foreground-mask").innerHTML;
+
+    function fadeImage(delta) {
+        const fadeEnd = fadeStart + values.fadeDuration;
+        const fadeProgress = delta > fadeEnd ? 1 : (delta - fadeStart) / values.fadeDuration;
+        const opacityValue = 1 - fadeProgress;
+        foregroundImage.setAttribute('opacity', opacityValue);
+
+        if (fadeProgress === 1) {
+            swapImage();
+        }
+    }
+
+    function swapImage() {
+        currentImageIndex = (currentImageIndex + 1) % imageSources.length;
+        const foregroundImageSource = imageSources[currentImageIndex];
+        const backgroundImageSource = imageSources[(currentImageIndex + 1) % imageSources.length];
+
+        foregroundImage.setAttribute('href', foregroundImageSource);
+        // Reset fade variables
+        fadeStart = 0;
+        lastMovement = 0;
+        // Using a setTimeout with a short delay so the image of the foreground has the time to update
+        // Not having a delay when we set the opacity back to 1 causes a flicker of the previous image to be displayed
+        setTimeout(() => {
+            // Restore original metaballs position
+            $("#foreground-mask").innerHTML = blankBlobState;
+            // Set the opacity of the new
+            // As the foreground image has been replaced with the old background one
+            // We can safely swap the background image's source with the next one
+            backgroundImage.setAttribute('href', backgroundImageSource);
+            foregroundImage.setAttribute('opacity', 1);
+
+            // Refresh blobs 
+            activeCircles = Array.from($$("#foreground-blob > circle"));
+            meta = new Map();
+            activeCircles.forEach(c => meta.set(c, { x: 0, y: 0, speed: 0 }))
+        }, 50);
+    }
 
     // Slider controls
     function addSliderListener(name) {
@@ -219,11 +293,7 @@
         });
     }
 
-    addSliderListener('blur');
-    addSliderListener('alphaMultiplier');
-    addSliderListener('alphaShift');
-    addSliderListener('fleeSpeed');
-    addSliderListener('fleeResistance');
+    ['blur', 'alphaMultiplier', 'alphaShift', 'fleeSpeed', 'fleeResistance'].forEach(addSliderListener);
 
     const svgBlurElement = $("#blurElement");
     const svgColorMatrixElement = $("#colorMatrixElement");

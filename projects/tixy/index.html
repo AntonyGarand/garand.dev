@@ -371,13 +371,14 @@
             updateCallback();
         }
 
-        // Custom starts here
+        // Modification starts here
         const keys = Object.keys(examples);
         const j = jscodeshift;
+        const allSamples = [...Object.values(examples), ...examples2];
         function nextRandom() {
-            const sampleCount = ~~(Math.random() * 8) + 2
+            const sampleCount = ~~(Math.random() * 8) + 1
             const samples = new Array(sampleCount).fill(0).map(
-                () => Math.random()<0.5?examples[keys[~~(Math.random() * keys.length)]]:pickRandom(examples2)
+                () => pickRandom(allSamples)
             );
 
             const splitTypes = [
