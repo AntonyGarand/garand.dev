@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>(t,i,x,y) => "gallery"</title>
+    <meta
+      name="description"
+      content="A detailled overview of community creations."
+    />
+    <link rel="icon" type="image/png" href="/favicon.9fed2980.png" />
+    <style>
+      body {
+        background: #000;
+      }
+      #output {
+        max-width: 1000px;
+        display: grid;
+        margin: auto;
+        justify-content: center;
+        grid-gap: 32px;
+        padding: 16px;
+        grid-template-columns: repeat(auto-fit, minmax(271px, 271px));
+      }
+      #output #title {
+        grid-column: 1/-1;
+        color: #f24;
+        grid-gap: 0;
+      }
+      #output #title h1 a {
+        color: #fff;
+        text-decoration: none;
+      }
+      #output #title h1 a :hover {
+        text-decoration: underline;
+      }
+      #output #title h2 {
+        color: #f24;
+      }
+      #output #title h1,
+      #output #title h2 {
+        font-size: 14px;
+        font-family: monospace;
+        font-weight: 400;
+        margin: 0;
+      }
+      #output a.canvas {
+        display: flex;
+        -webkit-tap-highlight-color: #f24;
+      }
+      #output a.canvas canvas {
+        display: flex;
+        opacity: 0.4;
+        transition: opacity 0.2s ease-in-out;
+      }
+      #output a.canvas canvas.active {
+        opacity: 1;
+      }
+    </style>
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:site" content="@aemkei" />
+    <meta name="twitter:title" content="tixy.land gallery" />
+    <meta
+      name="twitter:description"
+      content="A detailled overview of community creations."
+    />
+    <meta
+      name="twitter:image"
+      content="https://tixy.land/assets/twitter-card.png"
+    />
+  </head>
+  <body onclick="window.location.reload(true)">
+    <div id="output">
+      <div id="title">
+        <h1><a href="/">// tixy.land - gallery</a></h1>
+        <h2>// click for more details</h2>
+      </div>
+    </div>
+    <script src="./jscodeshift.min.js"></script>
+    <script>
+      const output = document.getElementById("output");
+      const count = 16;
+      const size = 16;
+      const spacing = 1;
+      const width = count * (size + spacing) - spacing;
+
+      const examples = {
+        "for every dot return 0 or 1 \nto change the visibility":
+          "Math.random() < 0.1",
+        "use a float between 0 and 1\n to define the size": "Math.random()",
+        "parameter `t` is \nthe time in seconds": "Math.sin(t)",
+        "param `i` is the index \nof the dot (0..255)": "i / 256",
+        "`x` is the column index\n from 0 to 15": "x / 16",
+        "`y` is the row\n also from 0 to 15": "y / 16",
+        "positive numbers are white,\nnegatives are red": "y - 7.5",
+        "use the time\nto animate values": "y - t",
+        "multiply the time\nto change the speed": "y - t*4",
+        "create patterns using \ndifferent color": "[1, 0, -1][i%3]",
+        "skip `Math.` to use methods \nand props like `sin` or `PI`":
+          "sin(t-sqrt((x-7.5)**2+(y-6)**2))",
+        "more examples ...": "sin(y/8 + t)",
+        "simple triangle": "y - x",
+        "quarter triangle": "(y > x) && (14-x < y)",
+        pattern: "i%4 - y%4",
+        grid: "x%4 && y%4",
+        square: "x>3 & y>3 & x<12 & y<12",
+        "animated square": "-(x>t & y>t & x<15-t & y<15-t)",
+        "mondrian squares": "(y-6) * (x-6)",
+        "moving cross": "(y-4*t|0) * (x-2-t|0)",
+        sierpinski: "4 * t & i & x & y",
+        "binary clock": "(t*10) & (1<<x) && y==8",
+        "random noise": "random() * 2 - 1",
+        "static smooth noise": "sin(i ** 2)",
+        "animated smooth noise": "cos(t + i + x * y)",
+        waves: "sin(x/2) - sin(x-t) - y+6",
+        "bloop bloop bloop\nby @v21": "(x-8)*(y-8) - sin(t)*64",
+        "fireworks\nby @p_malin and @aemkei": "-.4/(hypot(x-t%10,y-t%8)-t%2*9)",
+        "ripples\nby @thespite": "Math.sin(t-Math.sqrt(x*x+y*y))",
+        "scrolling TIXY font\nby @atesgoral":
+          "[5463,2194,2386][y+t*9&7]&1<<x-1",
+        "3d checker board\nby @p_malin": "(((x-8)/y+t*5)&1^1/y*8&1)*y/5",
+        "sticky blood\nby @joeytwiddle": "y-t*3+9+3*cos(x*3-t)-5*sin(x*7)",
+        "3d starfield\nby @p_malin": "d=y*y%5.9+1,!((x+t*50/d)&15)/d",
+        "dialogue with an alien\nby @chiptune": "1/32*tan(t/64*x*tan(i-x))",
+        "space invader\nby @keithclarkcouk + @zozuar":
+          "'p}¶¼<¼¶}p'.charCodeAt(x)&2**y",
+        "hungry pac man\nby @p_malin and @aemkei":
+          "hypot(x-=t%4*5,y-=8)<6&&x<y|y<-x",
+        "spectrum analyser\nby @joeytwiddle": "x&y<9&y>4+sin(8*t+x*x)+x/4",
+        diagonals: "y == x || -(15-x == y)",
+        frame: "x==0 | x==15 | y==0 | y==15",
+        drop: "8*t%13 - hypot(x-7.5, y-7.5)",
+        rotation: "sin(2*atan((y-7.5)/(x-7.5))+5*t)",
+        wipe: "(x-y) - sin(t) * 16",
+        "soft wipe": "(x-y)/24 - sin(t)",
+        disco: "sin(t*5) * tan(t*7)",
+        "input is limited \nto 32 characters!":
+          "(x-5)**2 + (y-5)**2 - 99*sin(t)",
+        "click here to \ncreate your own": "'HAVE FUN!'",
+      };
+
+      const examples2 = [
+        "((x^y)%2?sin:cos)(t)",
+        "y-t*3+9+3*cos(x*3-t)-5*sin(x*7)",
+        "-.4 /(hypot(x-t%10,y-t%8)-t%2*9)",
+        "1/32*tan(t/64*x*tan(i-x))",
+        "1-(sin((x&28+y&12)+t)>0?y:x)%4",
+        "sin(t-hypot(x-7.5,y-6))",
+        "4/((x-t*0.7)**2+(y-t)**2)-y/t/2",
+        "min(10-y+sin(x+sin(y+t*4))*5,0)",
+        "1-abs((x-6)*cos(t)+(y-6)*sin(t))",
+        "sin(t+((x-7.5)**2+(y-7.5)**2)/4)",
+        "(x^y)-i/t**1.8",
+        "-hypot(x-t%6*3,(t*5%8-4)**2-y)+2",
+        "[z=t-x,tan(y-z),-z/y,y-x%t][t&3]",
+        "tan(-y/max(x-8,y-8,7-x,7-y)-t*4)",
+        "sin(-t/hypot(x-7.5,y-7.5))",
+        "a=tan(t),((t*9+x-y*a^x*a+y)&8)-4",
+        "6-hypot(x-7.5,y-7.5)-sin(i/3-t)",
+        ".025/sin(t+(x^y|t))+t+i*6):.3",
+        "x>6|y>5?y<12&&sin(y+t+i*6):.3",
+        "[5463,2194,2386][y+t*9&7]&1<<x-1",
+        "1-((x*x-y+t*(1+x*x%5)*3)%16)/16",
+        "(((x-8)/y+t*5)&1^1/y*8&1)*y/5",
+        "(x+(t*10)/16)&y+(t*10)",
+        "d=y*y%5.9+1,!((x+t*50/d)&15)/d",
+        '"p}¶¼<¼¶}p".charCodeAt(x)&2**y',
+        "hypot(x-=t%2*9,y-=8)<6&&x<y|y<-x",
+        "x&y<9&y>4+sin(8*t+x*x)+x/4",
+        "([62,85,93,62][y/2]||65)>>x%9&1",
+        "t/y<(x+=t*24,(y+x^y-x)%29+y*2)",
+      ];
+
+      // Modification starts here
+      const keys = Object.keys(examples);
+      const j = jscodeshift;
+      const allSamples = [...Object.values(examples), ...examples2];
+      function getRandom() {
+        const sampleCount = ~~(Math.random() * 8) + 1;
+        const samples = new Array(sampleCount)
+          .fill(0)
+          .map(() => pickRandom(allSamples));
+
+        const splitTypes = [j.BinaryExpression, j.CallExpression];
+
+        const fragments = samples
+          .map((sample) => {
+            const available = [];
+            const jsc = j(sample);
+            splitTypes.forEach((type) =>
+              jsc.find(type).forEach((v) => available.push(v))
+            );
+            return pickRandom(available);
+          })
+          .map((f) => j(f).toSource());
+
+        const newCode = fragments.reduce((acc, v) => {
+          const delimiters = ["+", "-", "*", "%", "|", "<<", ">>", "%", "^"];
+          return (acc ? acc + pickRandom(delimiters) : "") + v;
+        }, "");
+
+        return newCode;
+      }
+
+      function pickRandom(arr) {
+        return arr[~~(Math.random() * arr.length)];
+      }
+
+      function render(callback, time, context) {
+        let index = 0;
+
+        context.fillStyle = "#000";
+        context.fillRect(0, 0, width, width);
+
+        for (let y = 0; y < count; y++) {
+          for (let x = 0; x < count; x++) {
+            const value = Number(callback(time, index, x, y));
+            const offset = size / 2;
+            let color = "#FFF";
+            let radius = (value * size) / 2;
+
+            if (radius < 0) {
+              radius = -radius;
+              color = "#F24";
+            }
+
+            if (radius > size / 2) {
+              radius = size / 2;
+            }
+
+            context.beginPath();
+            context.fillStyle = color;
+            context.arc(
+              x * (size + spacing) + offset,
+              y * (size + spacing) + offset,
+              radius,
+              0,
+              2 * Math.PI
+            );
+            context.fill();
+            index++;
+          }
+        }
+      }
+
+      const lines = Array(32)
+        .fill(0)
+        .map(() => {
+          let r = "";
+          do {
+            try {
+              r = getRandom();
+            } catch (e) {}
+          } while (r == "");
+          return r;
+        });
+      console.debug(lines.length);
+
+      lines.forEach((code) => {
+        const link = document.createElement("a");
+        const canvas = document.createElement("canvas");
+        const context = canvas.getContext("2d");
+
+        const url = new URL("/", document.location);
+        url.searchParams.set("code", code);
+
+        link.appendChild(canvas);
+        link.classList.add("canvas");
+        link.setAttribute("href", url);
+
+        output.appendChild(link);
+        canvas.width = width;
+        canvas.height = width;
+
+        const callback = new Function(
+          "t",
+          "i",
+          "x",
+          "y",
+          `
+        with (Math) {
+            try {
+                return ${code};
+            } catch(e){ return ''; }
+        }
+      `
+        );
+
+        const defaultTime = 0;
+
+        render(callback, defaultTime, context);
+
+        let time;
+        let pausesStart;
+        let pausesEnd;
+        let pausedDuration = 0;
+        let startTime;
+        let active = false;
+
+        function loop() {
+          setTimeout(loop, 10);
+
+          if (!active) {
+            return;
+          }
+
+          if (!startTime) {
+            startTime = Number(new Date());
+            time = 0;
+          } else {
+            time = (new Date() - startTime - pausedDuration) / 1000;
+          }
+
+          render(callback, time, context);
+        }
+
+        loop();
+
+        function start() {
+          if (active) {
+            return;
+          }
+
+          if (pausesStart) {
+            const duration = new Date() - pausesStart;
+            pausedDuration += duration;
+          }
+
+          active = true;
+          canvas.classList.add("active");
+        }
+
+        function stop() {
+          if (!active) {
+            return;
+          }
+
+          active = false;
+          // startTime = null;
+          pausesStart = new Date();
+          // render(callback, defaultTime, context);
+          canvas.classList.remove("active");
+        }
+
+        // canvas.addEventListener('mouseover', start);
+        // canvas.addEventListener('mouseout', stop);
+
+        let ticking = false;
+
+        function inView() {
+          const rect = link.getBoundingClientRect();
+          const height =
+            window.innerHeight || document.documentElement.clientHeight;
+          if (rect.top >= 0 && rect.bottom <= height) {
+            start();
+          } else {
+            stop();
+          }
+        }
+
+        document.addEventListener("scroll", function (e) {
+          if (!ticking) {
+            window.requestAnimationFrame(function () {
+              inView();
+              ticking = false;
+            });
+
+            ticking = true;
+          }
+        });
+
+        inView();
+      });
+    </script>
+  </body>
+</html>
