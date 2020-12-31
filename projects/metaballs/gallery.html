@@ -101,8 +101,8 @@
             <circle cx="500" cy="400" r="90" fill="white" />
         </g>
     </mask>
-    <image href="https://placekitten.com/1001/800" id="background-image" mask="url(#background-mask)" />
-    <image href="https://placekitten.com/1000/800" id="foreground-image" mask="url(#foreground-mask)" />
+    <image href="./img/2.jpg" width="1000" height="700" id="background-image" mask="url(#background-mask)" />
+    <image href="./img/1.jpg" width="1000" height="700" id="foreground-image" mask="url(#foreground-mask)" />
 </svg>
 
 <script>
@@ -232,11 +232,10 @@
 
     // Fade and swapping logic
     const imageSources = [
-        'https://placekitten.com/1000/1080',
-        'https://placekitten.com/1001/1080',
-        'https://placekitten.com/1002/1080',
-        'https://placekitten.com/1003/1080',
-        'https://placekitten.com/1004/1080',
+        './img/1.jpg',
+        './img/2.jpg',
+        './img/3.jpg',
+        './img/4.jpg',
     ]
     let currentImageIndex = 0;
 
@@ -316,3 +315,12 @@
     swapImage();
     updateSVG();
 </script>
+
+Background images: <br/>
+<a href="http://www.freepik.com">Designed by Freepik</a>
+<ul>
+    <li><a href="https://www.freepik.com/free-vector/tree-mountain-landscape_3379683.htm">https://www.freepik.com/free-vector/tree-mountain-landscape_3379683.htm</a></li>
+    <li><a href="https://www.freepik.com/free-vector/landscape-with-lake-trees-sun-mountains-background_3297758.htm">https://www.freepik.com/free-vector/landscape-with-lake-trees-sun-mountains-background_3297758.htm</a></li>
+    <li><a href="https://www.freepik.com/free-vector/sunset-sunrise-ocean-nature-landscape_6362773.htm">https://www.freepik.com/free-vector/sunset-sunrise-ocean-nature-landscape_6362773.htm</a></li>
+    <li><a href="https://www.freepik.com/free-vector/beautiful-gradient-spring-landscape_6969720.htm">https://www.freepik.com/free-vector/beautiful-gradient-spring-landscape_6969720.htm</a></li>
+</ul>
