@@ -232,12 +232,11 @@
 
     // Fade and swapping logic
     const imageSources = [
-        'https://placekitten.com/1000/800',
-        'https://placekitten.com/1001/800',
-        'https://placekitten.com/1002/800',
-        'https://placekitten.com/1003/800',
-        'https://placekitten.com/1004/800',
-        'https://placekitten.com/1005/800',
+        'https://placekitten.com/1000/1080',
+        'https://placekitten.com/1001/1080',
+        'https://placekitten.com/1002/1080',
+        'https://placekitten.com/1003/1080',
+        'https://placekitten.com/1004/1080',
     ]
     let currentImageIndex = 0;
 
@@ -280,7 +279,7 @@
             activeCircles = Array.from($$("#foreground-blob > circle"));
             meta = new Map();
             activeCircles.forEach(c => meta.set(c, { x: 0, y: 0, speed: 0 }))
-        }, 50);
+        }, 15);
     }
 
     // Slider controls
@@ -314,5 +313,6 @@
 
 
     // Calling this once to sync the values of `values` and the slider / color matrix
+    swapImage();
     updateSVG();
 </script>
