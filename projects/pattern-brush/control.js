@@ -13,6 +13,9 @@ const normalGroup = $$('#normals');
 const patternsRadioButton = $('input[type=radio][name=currentSVG]');
 let currentPattern = $$('input[type=radio][name=currentSVG]:checked + svg');
 
+const uploadSVGInput = $$('#uploadValue');
+const uploadSVGWrapper = $$('#uploadedSVGWrapper');
+
 const p0toP1 = $$('#p0-to-p1');
 const p2toP3 = $$('#p2-to-p3');
 
@@ -92,6 +95,28 @@ patternsRadioButton.forEach(input => {
     redrawCurve();
   });
 });
+
+uploadSVGInput.addEventListener('change', event => {
+  const selectedFile = uploadSVGInput.files[0];
+  setUploadedImage(selectedFile);
+});
+
+function setUploadedImage(file) {
+  if (file.type && file.type.indexOf('image') === -1) {
+    console.log('File is not an image.', file.type, file);
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.addEventListener('load', (event) => {
+    uploadSVGWrapper.innerHTML = event.target.result;
+    const newSVG = uploadSVGWrapper.children[0];
+    newSVG.setAttribute('style','overflow: visible');
+    currentPattern = newSVG;
+    redrawCurve();
+  });
+  reader.readAsText(file);
+}
 
 redrawCurve();
 
