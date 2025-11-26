@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sailing - Race to 99</title>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <style>
+      body {
+        margin: 0;
+        padding: 20px;
+        font-family: Arial, sans-serif;
+        background-color: #1a1a1a;
+        color: #fff;
+      }
+      h1 {
+        text-align: center;
+        color: #ffb000;
+        margin-bottom: 20px;
+      }
+      #controls {
+        text-align: center;
+        margin-bottom: 20px;
+      }
+      button {
+        background-color: #ffb000;
+        color: #1a1a1a;
+        border: none;
+        padding: 10px 20px;
+        margin: 0 5px;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 16px;
+        font-weight: bold;
+      }
+      button:hover {
+        background-color: #ff6b00;
+      }
+      button:disabled {
+        background-color: #555;
+        cursor: not-allowed;
+      }
+      #currentTime {
+        color: #ffb000;
+        font-size: 18px;
+        margin-top: 10px;
+      }
+      .speed-control {
+        margin-top: 10px;
+      }
+      .speed-control label {
+        color: #fff;
+        margin-right: 10px;
+      }
+      .speed-control input {
+        width: 200px;
+      }
+      .progress-control {
+        margin-top: 15px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+      }
+      .progress-control label {
+        color: #fff;
+        font-weight: bold;
+      }
+      #progressSlider {
+        width: 60%;
+        max-width: 800px;
+        height: 8px;
+        -webkit-appearance: none;
+        appearance: none;
+        background: #444;
+        outline: none;
+        border-radius: 4px;
+      }
+      #progressSlider::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 20px;
+        height: 20px;
+        background: #ffb000;
+        cursor: pointer;
+        border-radius: 50%;
+      }
+      #progressSlider::-moz-range-thumb {
+        width: 20px;
+        height: 20px;
+        background: #ffb000;
+        cursor: pointer;
+        border-radius: 50%;
+        border: none;
+      }
+      #progressSlider:hover::-webkit-slider-thumb {
+        background: #ff6b00;
+      }
+      #progressSlider:hover::-moz-range-thumb {
+        background: #ff6b00;
+      }
+      #chartsContainer {
+        display: flex;
+        gap: 20px;
+        width: 100%;
+        min-height: 600px;
+      }
+      #lineChart {
+        flex: 1;
+        min-height: 600px;
+        background-color: #2a2a2a;
+        border-radius: 8px;
+        min-width: 0;
+      }
+      #barChart {
+        flex: 1;
+        min-height: 600px;
+        background-color: #2a2a2a;
+        border-radius: 8px;
+        min-width: 0;
+      }
+      @media (max-width: 1200px) {
+        #chartsContainer {
+          flex-direction: column;
+        }
+        #progressSlider {
+          width: 90%;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Sailing - Race to 99</h1>
+    <div id="controls">
+      <button id="playBtn">Play</button>
+      <button id="pauseBtn" disabled>Pause</button>
+      <button id="resetBtn">Reset</button>
+      <div class="speed-control">
+        <label for="speedSlider">Speed: <span id="speedValue">10ms</span></label>
+        <input type="range" id="speedSlider" min="1" max="100" value="10" />
+      </div>
+      <div class="progress-control">
+        <label for="progressSlider">Progress:</label>
+        <input type="range" id="progressSlider" min="0" max="100" value="0" />
+      </div>
+      <div id="currentTime"></div>
+    </div>
+    <div id="chartsContainer">
+      <div id="lineChart"></div>
+      <div id="barChart"></div>
+    </div>
+
+    <script>
+      const RS_XP_TABLE = [
+        0, 0, 83, 174, 276, 388, 512, 650, 801, 969, 1154, 1358, 1584, 1833,
+        2107, 2411, 2746, 3115, 3523, 3973, 4470, 5018, 5624, 6291, 7028, 7842,
+        8740, 9730, 10824, 12031, 13363, 14833, 16456, 18247, 20224, 22406,
+        24815, 27473, 30408, 33648, 37224, 41171, 45529, 50339, 55649, 61512,
+        67983, 75127, 83014, 91721, 101333, 111945, 123660, 136594, 150872,
+        166636, 184040, 203254, 224466, 247886, 273742, 302288, 333804, 368599,
+        407015, 449428, 496254, 547953, 605032, 668051, 737627, 814445, 899257,
+        992895, 1096278, 1210421, 1336443, 1475581, 1629200, 1798808, 1986068,
+        2192818, 2421087, 2673114, 2951373, 3258594, 3597792, 3972294, 4385776,
+        4842295, 5346332, 5902831, 6517253, 7195629, 7944614, 8771558, 9684577,
+        10692629, 11805606, 13034431,
+      ];
+
+      const COLORS = [
+        "#FF6B6B", "#4ECDC4", "#45B7D1", "#FFA07A", "#98D8C8",
+        "#F7DC6F", "#BB8FCE", "#85C1E2", "#F8B739", "#52B788",
+        "#E76F51", "#2A9D8F", "#E9C46A", "#F4A261", "#264653",
+        "#E63946", "#A8DADC", "#F1FAEE", "#FFB703", "#FB8500",
+        "#8ECAE6", "#219EBC", "#023047", "#FFB4A2", "#B5838D",
+      ];
+
+      function getXPForLevel(level) {
+        const lvl = parseInt(level);
+        if (lvl >= 1 && lvl < RS_XP_TABLE.length) {
+          return RS_XP_TABLE[lvl];
+        }
+        return 0;
+      }
+
+      function inferXP(player, allPlayers) {
+        if (player.xp && player.xp !== "") {
+          return parseInt(player.xp);
+        }
+
+        const level = parseInt(player.lvl || 1);
+        const baseXP = getXPForLevel(level);
+        const nextLevelXP = getXPForLevel(level + 1);
+        const rank = player.rank;
+        const playersAtSameLevel = allPlayers.filter(
+          (p) => parseInt(p.lvl || 1) === level
+        );
+        const indexInLevel = playersAtSameLevel.findIndex(
+          (p) => p.rank === rank
+        );
+
+        if (indexInLevel !== -1 && playersAtSameLevel.length > 1) {
+          const ratio =
+            (playersAtSameLevel.length - indexInLevel - 1) /
+            playersAtSameLevel.length;
+          return Math.floor(baseXP + (nextLevelXP - baseXP) * ratio);
+        }
+
+        return baseXP;
+      }
+
+      function formatRelativeTime(milliseconds) {
+        const totalMinutes = Math.floor(milliseconds / 60000);
+        const totalHours = Math.floor(totalMinutes / 60);
+        const days = Math.floor(totalHours / 24);
+
+        if (days > 0) {
+          const hours = totalHours % 24;
+          const minutes = totalMinutes % 60;
+          return `Day ${days}, ${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+        } else if (totalHours > 0) {
+          const minutes = totalMinutes % 60;
+          return `${totalHours}h ${minutes}m`;
+        } else {
+          return `${totalMinutes}m`;
+        }
+      }
+
+      async function loadData() {
+        try {
+          const response = await fetch("data.json");
+          const rawData = await response.json();
+
+          const allData = [];
+          const playerMap = new Map();
+          const startTime = new Date(rawData[0].time).getTime();
+
+          // Build timestamped player data map
+          const timestampedData = new Map();
+
+          rawData.forEach((snapshot) => {
+            const date = new Date(snapshot.time);
+            const timestamp = date.getTime();
+            const relativeTime = timestamp - startTime;
+
+            const playerDataAtTime = [];
+            
+            snapshot.players.forEach((player) => {
+              const xp = inferXP(player, snapshot.players);
+              const level = parseInt(player.lvl || 1);
+
+              allData.push([relativeTime, player.name, xp, level]);
+              playerDataAtTime.push({
+                name: player.name,
+                xp: xp,
+                level: level,
+                rank: player.rank
+              });
+
+              if (!playerMap.has(player.name)) {
+                playerMap.set(player.name, xp);
+              } else {
+                playerMap.set(
+                  player.name,
+                  Math.max(playerMap.get(player.name), xp)
+                );
+              }
+            });
+
+            timestampedData.set(relativeTime, playerDataAtTime);
+          });
+
+          const topPlayers = Array.from(playerMap.entries())
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 15)
+            .map((entry) => entry[0]);
+
+          const filteredData = allData.filter((d) =>
+            topPlayers.includes(d[1])
+          );
+
+          filteredData.sort((a, b) => a[0] - b[0]);
+
+          return { allData: filteredData, topPlayers, startTime, timestampedData };
+        } catch (error) {
+          console.error("Error loading data:", error);
+          return null;
+        }
+      }
+
+      async function createCharts() {
+        const data = await loadData();
+        if (!data) {
+          document.getElementById("lineChart").innerHTML =
+            '<p style="color: red; padding: 20px;">Error loading data. Make sure out.json is in the same directory.</p>';
+          return;
+        }
+
+        const { allData, topPlayers, startTime, timestampedData } = data;
+        const lineChart = echarts.init(document.getElementById("lineChart"));
+        const barChart = echarts.init(document.getElementById("barChart"));
+
+        let currentFrame = 0;
+        let animationId = null;
+        let isPlaying = false;
+        let speed = 10;
+        let userIsScrubbingSlider = false;
+
+        const timestamps = [...new Set(allData.map((d) => d[0]))].sort(
+          (a, b) => a - b
+        );
+
+        console.log(`Total frames: ${timestamps.length}`);
+
+        // Set up progress slider
+        const progressSlider = document.getElementById("progressSlider");
+        progressSlider.max = timestamps.length - 1;
+
+        // Create player color map
+        const playerColors = {};
+        topPlayers.forEach((name, idx) => {
+          playerColors[name] = COLORS[idx % COLORS.length];
+        });
+
+        // LINE CHART SETUP
+        const datasetWithFilters = [];
+        const seriesList = [];
+
+        topPlayers.forEach((playerName, idx) => {
+          const datasetId = `dataset_${playerName.replace(/\s/g, '_')}`;
+
+          datasetWithFilters.push({
+            id: datasetId,
+            fromDatasetId: "dataset_raw",
+            transform: {
+              type: "filter",
+              config: {
+                dimension: "playerName",
+                "=": playerName,
+              },
+            },
+          });
+
+          seriesList.push({
+            type: "line",
+            datasetId: datasetId,
+            showSymbol: false,
+            name: playerName,
+            smooth: false,
+            lineStyle: {
+              width: 3,
+              color: COLORS[idx % COLORS.length],
+            },
+            itemStyle: {
+              color: COLORS[idx % COLORS.length],
+            },
+            endLabel: {
+              show: true,
+              formatter: function (params) {
+                const level = params.value && params.value[3] ? params.value[3] : '?';
+                return `${params.seriesName} (Lvl ${level})`;
+              },
+              color: COLORS[idx % COLORS.length],
+              fontSize: 12,
+            },
+            labelLayout: {
+              moveOverlap: "shiftY",
+            },
+            emphasis: {
+              focus: "series",
+            },
+            encode: {
+              x: "relativeTime",
+              y: "xp",
+              tooltip: ["xp", "level"],
+            },
+          });
+        });
+
+        let currentData = [];
+        let maxXP = 10000;
+
+        const lineOption = {
+          animationDuration: 0,
+          dataset: [
+            {
+              id: "dataset_raw",
+              source: currentData,
+              dimensions: ["relativeTime", "playerName", "xp", "level"],
+            },
+            ...datasetWithFilters,
+          ],
+          title: {
+            text: "XP Progress Over Time",
+            subtext: "",
+            left: "center",
+            top: 10,
+            textStyle: { color: "#ffb000", fontSize: 20 },
+            subtextStyle: { color: "#fff", fontSize: 14 },
+          },
+          tooltip: {
+            trigger: "axis",
+            formatter: function (params) {
+              if (!params || params.length === 0) return "";
+              const relativeTime = params[0].value ? params[0].value[0] : null;
+              if (relativeTime === null) return "";
+              
+              const timeStr = formatRelativeTime(relativeTime);
+              let tooltip = `<strong>${timeStr}</strong><br/>`;
+              
+              params
+                .filter(p => p.value && p.value[2] !== undefined)
+                .sort((a, b) => (b.value[2] || 0) - (a.value[2] || 0))
+                .forEach((param) => {
+                  const xp = param.value[2] || 0;
+                  const level = param.value[3] || '?';
+                  tooltip += `${param.marker} ${param.seriesName}: ${xp.toLocaleString()} XP (Lvl ${level})<br/>`;
+                });
+              return tooltip;
+            },
+          },
+          legend: {
+            type: "scroll",
+            data: topPlayers,
+            top: 50,
+            textStyle: { color: "#fff" },
+          },
+          grid: {
+            top: 100,
+            bottom: 60,
+            left: 80,
+            right: 150,
+            containLabel: true,
+          },
+          xAxis: {
+            type: "value",
+            boundaryGap: false,
+            name: "Time Since Start",
+            nameLocation: "middle",
+            nameGap: 30,
+            nameTextStyle: { color: "#fff" },
+            axisLabel: {
+              color: "#fff",
+              formatter: function (value) {
+                return formatRelativeTime(value);
+              },
+            },
+            splitLine: {
+              lineStyle: { color: "#444" },
+            },
+          },
+          yAxis: {
+            type: "value",
+            name: "Experience Points",
+            nameTextStyle: { color: "#fff" },
+            max: maxXP,
+            axisLabel: {
+              color: "#fff",
+              formatter: (value) => value.toLocaleString(),
+            },
+            splitLine: {
+              lineStyle: { color: "#444" },
+            },
+          },
+          series: seriesList,
+        };
+
+        lineChart.setOption(lineOption);
+
+        // BAR CHART SETUP
+        const barOption = {
+          title: {
+            text: "Top 10 Leaderboard",
+            left: "center",
+            top: 10,
+            textStyle: { color: "#ffb000", fontSize: 20 },
+          },
+          grid: {
+            top: 60,
+            bottom: 80,
+            left: 150,
+            right: 100,
+          },
+          xAxis: {
+            max: 'dataMax',
+            axisLabel: {
+              color: '#fff',
+              formatter: function (n) {
+                return Math.round(n).toLocaleString();
+              },
+            },
+            splitLine: {
+              lineStyle: { color: "#444" },
+            },
+          },
+          yAxis: {
+            type: 'category',
+            data: [],
+            inverse: true,
+            animationDuration: 100,
+            animationDurationUpdate: 100,
+            axisLabel: {
+              show: true,
+              fontSize: 14,
+              color: '#fff',
+            },
+          },
+          series: [
+            {
+              realtimeSort: true,
+              type: 'bar',
+              data: [],
+              itemStyle: {
+                color: function (param) {
+                  return playerColors[param.name] || '#5470c6';
+                },
+              },
+              label: {
+                show: true,
+                precision: 0,
+                position: 'right',
+                valueAnimation: true,
+                fontFamily: 'monospace',
+                color: '#fff',
+                formatter: function (param) {
+                  return param.value.toLocaleString() + ' XP';
+                },
+              },
+            },
+          ],
+          animationDuration: 0,
+          animationDurationUpdate: 100,
+          animationEasing: 'linear',
+          animationEasingUpdate: 'linear',
+          graphic: {
+            elements: [
+              {
+                type: 'text',
+                right: 100,
+                bottom: 20,
+                style: {
+                  text: '',
+                  font: 'bolder 60px monospace',
+                  fill: 'rgba(255, 176, 0, 0.25)',
+                },
+                z: 100,
+              },
+            ],
+          },
+        };
+
+        barChart.setOption(barOption);
+
+        function updateCharts() {
+          if (currentFrame >= timestamps.length) {
+            pause();
+            return;
+          }
+
+          const currentRelativeTime = timestamps[currentFrame];
+          currentData = allData.filter((d) => d[0] <= currentRelativeTime);
+
+          // Update max XP for dynamic scaling
+          const currentMaxXP = Math.max(...currentData.map(d => d[2]));
+          const newMaxXP = Math.ceil(currentMaxXP * 1.1);
+          
+          // Only update if significantly different to avoid constant rescaling
+          if (newMaxXP > maxXP || newMaxXP < maxXP * 0.9) {
+            maxXP = newMaxXP;
+          }
+
+          // Update line chart with explicit yAxis update
+          lineChart.setOption({
+            dataset: [
+              {
+                id: "dataset_raw",
+                source: currentData,
+              },
+            ],
+            title: {
+              subtext: formatRelativeTime(currentRelativeTime),
+            },
+            yAxis: {
+              max: maxXP,
+            },
+          }, false, true);
+
+          // Update bar chart
+          const playersAtTime = timestampedData.get(currentRelativeTime) || [];
+          const top10 = playersAtTime
+            .sort((a, b) => b.xp - a.xp)
+            .slice(0, 10);
+
+          const playerNames = top10.map(p => p.name);
+          const barData = top10.map(p => ({
+            name: p.name,
+            value: p.xp,
+          }));
+
+          barChart.setOption({
+            yAxis: {
+              data: playerNames,
+            },
+            series: [
+              {
+                data: barData,
+              },
+            ],
+            graphic: {
+              elements: [
+                {
+                  style: {
+                    text: formatRelativeTime(currentRelativeTime),
+                  },
+                },
+              ],
+            },
+          });
+
+          // Update progress slider
+          if (!userIsScrubbingSlider) {
+            progressSlider.value = currentFrame;
+          }
+
+          const actualDate = new Date(startTime + currentRelativeTime);
+          document.getElementById(
+            "currentTime"
+          ).textContent = `${formatRelativeTime(currentRelativeTime)} (${actualDate.toLocaleDateString()} ${actualDate.toLocaleTimeString()}) - Frame ${currentFrame + 1}/${timestamps.length}`;
+        }
+
+        function play() {
+          if (isPlaying) return;
+          isPlaying = true;
+          document.getElementById("playBtn").disabled = true;
+          document.getElementById("pauseBtn").disabled = false;
+
+          let lastTime = performance.now();
+
+          function animate() {
+            if (!isPlaying) return;
+
+            const now = performance.now();
+            const elapsed = now - lastTime;
+
+            // Frame skipping for speeds below 10ms
+            let framesToSkip = 1;
+            if (speed < 10) {
+              framesToSkip = Math.max(1, Math.floor(10 / speed));
+            }
+
+            if (elapsed >= Math.max(speed, 10)) {
+              lastTime = now;
+              
+              for (let i = 0; i < framesToSkip && currentFrame < timestamps.length; i++) {
+                if (currentFrame >= timestamps.length) {
+                  pause();
+                  return;
+                }
+                currentFrame++;
+              }
+              
+              updateCharts();
+
+              if (currentFrame >= timestamps.length) {
+                pause();
+                return;
+              }
+            }
+
+            animationId = requestAnimationFrame(animate);
+          }
+
+          animate();
+        }
+
+        function pause() {
+          isPlaying = false;
+          if (animationId) cancelAnimationFrame(animationId);
+          document.getElementById("playBtn").disabled = false;
+          document.getElementById("pauseBtn").disabled = true;
+        }
+
+        function reset() {
+          pause();
+          currentFrame = 0;
+          currentData = [];
+          maxXP = 10000;
+          progressSlider.value = 0;
+          lineChart.setOption({
+            dataset: [
+              {
+                id: "dataset_raw",
+                source: currentData,
+              },
+            ],
+            title: {
+              subtext: "",
+            },
+            yAxis: {
+              max: maxXP,
+            },
+          });
+          barChart.setOption({
+            yAxis: {
+              data: [],
+            },
+            series: [{ data: [] }],
+            graphic: {
+              elements: [{ style: { text: '' } }],
+            },
+          });
+          document.getElementById("currentTime").textContent = "";
+        }
+
+        // Speed slider
+        const speedSlider = document.getElementById("speedSlider");
+        const speedValue = document.getElementById("speedValue");
+        
+        speedSlider.addEventListener("input", (e) => {
+          speed = parseInt(e.target.value);
+          speedValue.textContent = `${speed}ms`;
+        });
+
+        // Progress slider
+        progressSlider.addEventListener("mousedown", () => {
+          userIsScrubbingSlider = true;
+        });
+
+        progressSlider.addEventListener("mouseup", () => {
+          userIsScrubbingSlider = false;
+        });
+
+        progressSlider.addEventListener("input", (e) => {
+          const newFrame = parseInt(e.target.value);
+          currentFrame = newFrame;
+          updateCharts();
+        });
+
+        // Touch support for mobile
+        progressSlider.addEventListener("touchstart", () => {
+          userIsScrubbingSlider = true;
+        });
+
+        progressSlider.addEventListener("touchend", () => {
+          userIsScrubbingSlider = false;
+        });
+
+        document.getElementById("playBtn").addEventListener("click", play);
+        document.getElementById("pauseBtn").addEventListener("click", pause);
+        document.getElementById("resetBtn").addEventListener("click", reset);
+
+        window.addEventListener("resize", () => {
+          lineChart.resize();
+          barChart.resize();
+        });
+      }
+
+      createCharts();
+    </script>
+  </body>
+</html>
