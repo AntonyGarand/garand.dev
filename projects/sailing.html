@@ -2,129 +2,150 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Sailing - Race to 99</title>
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
     <style>
+      :root {
+        --bg: #1a1a1a;
+        --panel: #2a2a2a;
+        --text: #fff;
+        --accent: #ffb000;
+        --accent-2: #ff6b00;
+        --grid: #444;
+      }
+      * {
+        box-sizing: border-box;
+      }
       body {
         margin: 0;
-        padding: 20px;
+        padding: 16px;
         font-family: Arial, sans-serif;
-        background-color: #1a1a1a;
-        color: #fff;
+        background-color: var(--bg);
+        color: var(--text);
       }
       h1 {
         text-align: center;
-        color: #ffb000;
-        margin-bottom: 20px;
+        color: var(--accent);
+        margin: 0 0 12px;
+        font-size: 22px;
+        line-height: 1.2;
       }
       #controls {
         text-align: center;
-        margin-bottom: 20px;
+        margin-bottom: 12px;
       }
       button {
-        background-color: #ffb000;
+        background-color: var(--accent);
         color: #1a1a1a;
         border: none;
-        padding: 10px 20px;
-        margin: 0 5px;
-        border-radius: 5px;
+        padding: 10px 16px;
+        margin: 4px 4px;
+        border-radius: 8px;
         cursor: pointer;
         font-size: 16px;
         font-weight: bold;
       }
       button:hover {
-        background-color: #ff6b00;
+        background-color: var(--accent-2);
       }
       button:disabled {
         background-color: #555;
         cursor: not-allowed;
       }
       #currentTime {
-        color: #ffb000;
-        font-size: 18px;
-        margin-top: 10px;
+        color: var(--accent);
+        font-size: 14px;
+        margin-top: 8px;
       }
       .speed-control {
-        margin-top: 10px;
+        margin-top: 8px;
       }
       .speed-control label {
-        color: #fff;
+        color: var(--text);
         margin-right: 10px;
+        font-size: 14px;
       }
       .speed-control input {
-        width: 200px;
+        width: 220px;
       }
       .progress-control {
-        margin-top: 15px;
+        margin-top: 12px;
         display: flex;
         align-items: center;
         justify-content: center;
         gap: 10px;
       }
       .progress-control label {
-        color: #fff;
+        color: var(--text);
         font-weight: bold;
+        font-size: 14px;
       }
-      #progressSlider {
-        width: 60%;
-        max-width: 800px;
+      input[type="range"] {
         height: 8px;
         -webkit-appearance: none;
         appearance: none;
-        background: #444;
+        background: var(--grid);
         outline: none;
         border-radius: 4px;
       }
-      #progressSlider::-webkit-slider-thumb {
+      #progressSlider {
+        width: 95%;
+        max-width: 900px;
+      }
+      input[type="range"]::-webkit-slider-thumb {
         -webkit-appearance: none;
         appearance: none;
-        width: 20px;
-        height: 20px;
-        background: #ffb000;
+        width: 22px;
+        height: 22px;
+        background: var(--accent);
         cursor: pointer;
         border-radius: 50%;
       }
-      #progressSlider::-moz-range-thumb {
-        width: 20px;
-        height: 20px;
-        background: #ffb000;
+      input[type="range"]::-moz-range-thumb {
+        width: 22px;
+        height: 22px;
+        background: var(--accent);
         cursor: pointer;
         border-radius: 50%;
         border: none;
       }
-      #progressSlider:hover::-webkit-slider-thumb {
-        background: #ff6b00;
+      input[type="range"]:hover::-webkit-slider-thumb {
+        background: var(--accent-2);
       }
-      #progressSlider:hover::-moz-range-thumb {
-        background: #ff6b00;
+      input[type="range"]:hover::-moz-range-thumb {
+        background: var(--accent-2);
       }
       #chartsContainer {
         display: flex;
-        gap: 20px;
+        flex-direction: column;
+        gap: 12px;
         width: 100%;
-        min-height: 600px;
+        min-height: 0;
+      }
+      #lineChart,
+      #barChart {
+        width: 100%;
+        background-color: var(--panel);
+        border-radius: 10px;
+        min-width: 0;
       }
       #lineChart {
-        flex: 1;
-        min-height: 600px;
-        background-color: #2a2a2a;
-        border-radius: 8px;
-        min-width: 0;
+        height: 70vh;
+        min-height: 480px;
       }
       #barChart {
-        flex: 1;
-        min-height: 600px;
-        background-color: #2a2a2a;
-        border-radius: 8px;
-        min-width: 0;
+        height: 40vh;
+        min-height: 320px;
       }
-      @media (max-width: 1200px) {
-        #chartsContainer {
-          flex-direction: column;
+      @media (min-width: 900px) {
+        #lineChart {
+          height: 68vh;
+          min-height: 520px;
         }
-        #progressSlider {
-          width: 90%;
+        #barChart {
+          height: 38vh;
+          min-height: 360px;
         }
       }
     </style>
@@ -136,8 +157,10 @@
       <button id="pauseBtn" disabled>Pause</button>
       <button id="resetBtn">Reset</button>
       <div class="speed-control">
-        <label for="speedSlider">Speed: <span id="speedValue">10ms</span></label>
-        <input type="range" id="speedSlider" min="1" max="100" value="10" />
+        <label for="speedSlider"
+          >Speed: <span id="speedValue">1.00x</span></label
+        >
+        <input type="range" id="speedSlider" min="25" max="2500" value="100" />
       </div>
       <div class="progress-control">
         <label for="progressSlider">Progress:</label>
@@ -145,6 +168,7 @@
       </div>
       <div id="currentTime"></div>
     </div>
+
     <div id="chartsContainer">
       <div id="lineChart"></div>
       <div id="barChart"></div>
@@ -166,26 +190,41 @@
       ];
 
       const COLORS = [
-        "#FF6B6B", "#4ECDC4", "#45B7D1", "#FFA07A", "#98D8C8",
-        "#F7DC6F", "#BB8FCE", "#85C1E2", "#F8B739", "#52B788",
-        "#E76F51", "#2A9D8F", "#E9C46A", "#F4A261", "#264653",
-        "#E63946", "#A8DADC", "#F1FAEE", "#FFB703", "#FB8500",
-        "#8ECAE6", "#219EBC", "#023047", "#FFB4A2", "#B5838D",
+        "#FF6B6B",
+        "#4ECDC4",
+        "#45B7D1",
+        "#FFA07A",
+        "#98D8C8",
+        "#F7DC6F",
+        "#BB8FCE",
+        "#85C1E2",
+        "#F8B739",
+        "#52B788",
+        "#E76F51",
+        "#2A9D8F",
+        "#E9C46A",
+        "#F4A261",
+        "#86B653",
+        "#E63946",
+        "#A8DADC",
+        "#F1FAEE",
+        "#FFB703",
+        "#FB8500",
+        "#8ECAE6",
+        "#219EBC",
+        "#023047",
+        "#FFB4A2",
+        "#B5838D",
       ];
 
       function getXPForLevel(level) {
         const lvl = parseInt(level);
-        if (lvl >= 1 && lvl < RS_XP_TABLE.length) {
-          return RS_XP_TABLE[lvl];
-        }
+        if (lvl >= 1 && lvl < RS_XP_TABLE.length) return RS_XP_TABLE[lvl];
         return 0;
       }
 
       function inferXP(player, allPlayers) {
-        if (player.xp && player.xp !== "") {
-          return parseInt(player.xp);
-        }
-
+        if (player.xp && player.xp !== "") return parseInt(player.xp);
         const level = parseInt(player.lvl || 1);
         const baseXP = getXPForLevel(level);
         const nextLevelXP = getXPForLevel(level + 1);
@@ -196,26 +235,25 @@
         const indexInLevel = playersAtSameLevel.findIndex(
           (p) => p.rank === rank
         );
-
         if (indexInLevel !== -1 && playersAtSameLevel.length > 1) {
           const ratio =
             (playersAtSameLevel.length - indexInLevel - 1) /
             playersAtSameLevel.length;
           return Math.floor(baseXP + (nextLevelXP - baseXP) * ratio);
         }
-
         return baseXP;
       }
 
       function formatRelativeTime(milliseconds) {
         const totalMinutes = Math.floor(milliseconds / 60000);
         const totalHours = Math.floor(totalMinutes / 60);
-        const days = Math.floor(totalHours / 24);
-
+        const days = Math.floor(totalHours / 24) + 1;
         if (days > 0) {
           const hours = totalHours % 24;
           const minutes = totalMinutes % 60;
-          return `Day ${days}, ${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+          return `Day ${days}, ${String(hours).padStart(2, "0")}:${String(
+            minutes
+          ).padStart(2, "0")}`;
         } else if (totalHours > 0) {
           const minutes = totalMinutes % 60;
           return `${totalHours}h ${minutes}m`;
@@ -225,72 +263,95 @@
       }
 
       async function loadData() {
-        try {
-          const response = await fetch("data.json");
-          const rawData = await response.json();
+        const response = await fetch("data.json");
+        const rawData = await response.json();
 
-          const allData = [];
-          const playerMap = new Map();
-          const startTime = new Date(rawData[0].time).getTime();
+        const allData = [];
+        const playerMap = new Map();
+        const timestampedData = new Map();
 
-          // Build timestamped player data map
-          const timestampedData = new Map();
+        const startTime = new Date(rawData[0].time).getTime();
 
-          rawData.forEach((snapshot) => {
-            const date = new Date(snapshot.time);
-            const timestamp = date.getTime();
-            const relativeTime = timestamp - startTime;
+        rawData.forEach((snapshot) => {
+          const timestamp = new Date(snapshot.time).getTime();
+          const t = timestamp - startTime;
+          const list = [];
 
-            const playerDataAtTime = [];
-            
-            snapshot.players.forEach((player) => {
-              const xp = inferXP(player, snapshot.players);
-              const level = parseInt(player.lvl || 1);
+          snapshot.players.forEach((player) => {
+            const xp = inferXP(player, snapshot.players);
+            const lvl = parseInt(player.lvl || 1);
 
-              allData.push([relativeTime, player.name, xp, level]);
-              playerDataAtTime.push({
-                name: player.name,
-                xp: xp,
-                level: level,
-                rank: player.rank
-              });
+            allData.push([t, player.name, xp, lvl]);
+            list.push({ name: player.name, xp, level: lvl, rank: player.rank });
 
-              if (!playerMap.has(player.name)) {
-                playerMap.set(player.name, xp);
-              } else {
-                playerMap.set(
-                  player.name,
-                  Math.max(playerMap.get(player.name), xp)
-                );
-              }
-            });
-
-            timestampedData.set(relativeTime, playerDataAtTime);
+            playerMap.set(
+              player.name,
+              Math.max(playerMap.get(player.name) || 0, xp)
+            );
           });
 
-          const topPlayers = Array.from(playerMap.entries())
-            .sort((a, b) => b[1] - a[1])
-            .slice(0, 15)
-            .map((entry) => entry[0]);
+          timestampedData.set(t, list);
+        });
 
-          const filteredData = allData.filter((d) =>
-            topPlayers.includes(d[1])
-          );
+        const topPlayers = Array.from(playerMap.entries())
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 15)
+          .map((e) => e[0]);
 
-          filteredData.sort((a, b) => a[0] - b[0]);
+        const filteredData = allData.filter((d) => topPlayers.includes(d[1]));
+        filteredData.sort((a, b) => a[0] - b[0]);
 
-          return { allData: filteredData, topPlayers, startTime, timestampedData };
-        } catch (error) {
-          console.error("Error loading data:", error);
-          return null;
+        return {
+          allData: filteredData,
+          topPlayers,
+          startTime,
+          timestampedData,
+        };
+      }
+
+      function computeYAxisMax(v) {
+        const padded = Math.ceil(v * 1.1);
+        if (padded <= 10000) return 10000;
+        const digits = Math.floor(Math.log10(padded));
+        const base = Math.pow(10, Math.max(4, digits - 1));
+        return Math.ceil(padded / base) * base;
+      }
+
+      function computeXAxisInterval(chart) {
+        const width = chart.getWidth ? chart.getWidth() : 800;
+        if (width < 360) return 5;
+        if (width < 480) return 4;
+        if (width < 640) return 3;
+        if (width < 820) return 2;
+        return 0;
+      }
+
+      function selectEndLabelLevel(t, name, timestampedData) {
+        const list = timestampedData.get(t) || [];
+        const p = list.find((x) => x.name === name);
+        return p ? p.level : null;
+      }
+
+      function buildDownsampledTimestamps(baseTimestamps, maxKeep, ensureLast) {
+        if (baseTimestamps.length <= maxKeep) return baseTimestamps.slice();
+        const last = baseTimestamps[baseTimestamps.length - 1];
+        const step = Math.ceil(baseTimestamps.length / maxKeep);
+        const kept = [];
+        for (let i = 0; i < baseTimestamps.length; i += step) {
+          kept.push(baseTimestamps[i]);
         }
+        if (ensureLast && kept[kept.length - 1] !== last) kept.push(last);
+        return kept;
       }
 
       async function createCharts() {
-        const data = await loadData();
-        if (!data) {
+        let data;
+        try {
+          data = await loadData();
+        } catch (err) {
+          console.error(err);
           document.getElementById("lineChart").innerHTML =
-            '<p style="color: red; padding: 20px;">Error loading data. Make sure out.json is in the same directory.</p>';
+            '<p style="color: red; padding: 20px;">Error loading data.json</p>';
           return;
         }
 
@@ -298,92 +359,101 @@
         const lineChart = echarts.init(document.getElementById("lineChart"));
         const barChart = echarts.init(document.getElementById("barChart"));
 
+        // Playback state
         let currentFrame = 0;
-        let animationId = null;
         let isPlaying = false;
-        let speed = 10;
+        let playbackSpeed = 1.0; // multiplier
         let userIsScrubbingSlider = false;
 
-        const timestamps = [...new Set(allData.map((d) => d[0]))].sort(
+        // Animation timing: track the "current time" along the timestamps in ms
+        let virtualTime = 0; // equals currentTimestamps[currentFrame]
+        let lastRafTime = 0;
+        let rafId = null;
+
+        const baseTimestamps = [...new Set(allData.map((d) => d[0]))].sort(
           (a, b) => a - b
         );
 
-        console.log(`Total frames: ${timestamps.length}`);
+        let currentTimestamps = baseTimestamps.slice();
 
-        // Set up progress slider
         const progressSlider = document.getElementById("progressSlider");
-        progressSlider.max = timestamps.length - 1;
+        progressSlider.max = currentTimestamps.length - 1;
 
-        // Create player color map
         const playerColors = {};
         topPlayers.forEach((name, idx) => {
           playerColors[name] = COLORS[idx % COLORS.length];
         });
 
-        // LINE CHART SETUP
+        const lastT = baseTimestamps[baseTimestamps.length - 1];
+        const finalPlayersAtTime = (timestampedData.get(lastT) || []).slice();
+        finalPlayersAtTime.sort((a, b) => b.xp - a.xp);
+        const legendOrder = finalPlayersAtTime
+          .map((p) => p.name)
+          .filter((n) => topPlayers.includes(n));
+        topPlayers.forEach((n) => {
+          if (!legendOrder.includes(n)) legendOrder.push(n);
+        });
+
+        const legendRich = {};
+        legendOrder.forEach((name) => {
+          legendRich[name.replace(/\W/g, "_")] = {
+            color: playerColors[name],
+            fontSize: 12,
+            fontWeight: "bold",
+          };
+        });
+
         const datasetWithFilters = [];
         const seriesList = [];
-
-        topPlayers.forEach((playerName, idx) => {
-          const datasetId = `dataset_${playerName.replace(/\s/g, '_')}`;
-
+        topPlayers.forEach((playerName) => {
+          const datasetId = `dataset_${playerName.replace(/\s/g, "_")}`;
           datasetWithFilters.push({
             id: datasetId,
             fromDatasetId: "dataset_raw",
             transform: {
               type: "filter",
-              config: {
-                dimension: "playerName",
-                "=": playerName,
-              },
+              config: { dimension: "playerName", "=": playerName },
             },
           });
 
           seriesList.push({
             type: "line",
-            datasetId: datasetId,
+            datasetId,
             showSymbol: false,
             name: playerName,
             smooth: false,
-            lineStyle: {
-              width: 3,
-              color: COLORS[idx % COLORS.length],
-            },
-            itemStyle: {
-              color: COLORS[idx % COLORS.length],
-            },
+            lineStyle: { width: 1.5, color: playerColors[playerName] },
+            itemStyle: { color: playerColors[playerName] },
             endLabel: {
               show: true,
-              formatter: function (params) {
-                const level = params.value && params.value[3] ? params.value[3] : '?';
-                return `${params.seriesName} (Lvl ${level})`;
+              formatter: (p) => {
+                const t =
+                  currentTimestamps[
+                    Math.min(currentFrame, currentTimestamps.length - 1)
+                  ];
+                const lvl =
+                  selectEndLabelLevel(t, p.seriesName, timestampedData) ?? "";
+                return lvl ? `${p.seriesName} - lvl ${lvl}` : p.seriesName;
               },
-              color: COLORS[idx % COLORS.length],
-              fontSize: 12,
+              color: playerColors[playerName],
+              fontSize: 11,
+              overflow: "break",
+              width: 120,
             },
-            labelLayout: {
-              moveOverlap: "shiftY",
-            },
-            emphasis: {
-              focus: "series",
-            },
-            encode: {
-              x: "relativeTime",
-              y: "xp",
-              tooltip: ["xp", "level"],
-            },
+            labelLayout: { moveOverlap: "shiftY" },
+            emphasis: { focus: "series" },
+            encode: { x: "relativeTime", y: "xp", tooltip: ["xp", "level"] },
           });
         });
 
-        let currentData = [];
         let maxXP = 10000;
 
         const lineOption = {
-          animationDuration: 0,
+          animation: false,
           dataset: [
             {
               id: "dataset_raw",
-              source: currentData,
+              source: [],
               dimensions: ["relativeTime", "playerName", "xp", "level"],
             },
             ...datasetWithFilters,
@@ -392,42 +462,56 @@
             text: "XP Progress Over Time",
             subtext: "",
             left: "center",
-            top: 10,
-            textStyle: { color: "#ffb000", fontSize: 20 },
-            subtextStyle: { color: "#fff", fontSize: 14 },
+            top: 8,
+            textStyle: { color: "#ffb000", fontSize: 18 },
+            subtextStyle: { color: "#fff", fontSize: 13 },
           },
           tooltip: {
             trigger: "axis",
+            appendToBody: true,
+            confine: true,
+            extraCssText:
+              "max-height:50vh;overflow:auto;background:#222;border:1px solid #444;",
             formatter: function (params) {
               if (!params || params.length === 0) return "";
               const relativeTime = params[0].value ? params[0].value[0] : null;
               if (relativeTime === null) return "";
-              
               const timeStr = formatRelativeTime(relativeTime);
               let tooltip = `<strong>${timeStr}</strong><br/>`;
-              
               params
-                .filter(p => p.value && p.value[2] !== undefined)
+                .filter((p) => p.value && p.value[2] !== undefined)
                 .sort((a, b) => (b.value[2] || 0) - (a.value[2] || 0))
                 .forEach((param) => {
                   const xp = param.value[2] || 0;
-                  const level = param.value[3] || '?';
-                  tooltip += `${param.marker} ${param.seriesName}: ${xp.toLocaleString()} XP (Lvl ${level})<br/>`;
+                  tooltip += `${param.marker} ${
+                    param.seriesName
+                  }: ${xp.toLocaleString()} XP<br/>`;
                 });
               return tooltip;
             },
           },
           legend: {
+            show: true,
             type: "scroll",
-            data: topPlayers,
-            top: 50,
-            textStyle: { color: "#fff" },
+            orient: "vertical",
+            left: 85,
+            top: 80,
+            data: legendOrder,
+            itemWidth: 0,
+            itemHeight: 0,
+            itemGap: 2,
+            textStyle: { color: "#fff", rich: legendRich },
+            formatter: function (name) {
+              const key = name.replace(/\W/g, "_");
+              return `{${key}|${name}}`;
+            },
+            pageTextStyle: { color: "#fff" },
           },
           grid: {
-            top: 100,
-            bottom: 60,
-            left: 80,
-            right: 150,
+            top: 80,
+            bottom: 56,
+            left: 20,
+            right: 80,
             containLabel: true,
           },
           xAxis: {
@@ -435,310 +519,300 @@
             boundaryGap: false,
             name: "Time Since Start",
             nameLocation: "middle",
-            nameGap: 30,
-            nameTextStyle: { color: "#fff" },
+            nameGap: 26,
+            nameTextStyle: { color: "#fff", fontSize: 12 },
             axisLabel: {
               color: "#fff",
-              formatter: function (value) {
-                return formatRelativeTime(value);
-              },
+              formatter: (v) => formatRelativeTime(v),
+              interval: computeXAxisInterval(lineChart),
+              hideOverlap: true,
             },
-            splitLine: {
-              lineStyle: { color: "#444" },
-            },
+            splitLine: { lineStyle: { color: "#444" } },
+            animation: false,
           },
           yAxis: {
             type: "value",
-            name: "Experience Points",
-            nameTextStyle: { color: "#fff" },
+            name: "XP",
+            nameTextStyle: { color: "#fff", fontSize: 12 },
             max: maxXP,
             axisLabel: {
               color: "#fff",
-              formatter: (value) => value.toLocaleString(),
+              formatter: (v) => Number(v).toLocaleString(),
             },
-            splitLine: {
-              lineStyle: { color: "#444" },
-            },
+            splitLine: { lineStyle: { color: "#444" } },
+            animation: false,
           },
           series: seriesList,
         };
 
-        lineChart.setOption(lineOption);
+        lineChart.setOption(lineOption, true);
 
-        // BAR CHART SETUP
         const barOption = {
+          animation: false,
           title: {
             text: "Top 10 Leaderboard",
             left: "center",
-            top: 10,
-            textStyle: { color: "#ffb000", fontSize: 20 },
+            top: 8,
+            textStyle: { color: "#ffb000", fontSize: 18 },
           },
-          grid: {
-            top: 60,
-            bottom: 80,
-            left: 150,
-            right: 100,
-          },
+          grid: { top: 56, bottom: 70, left: 120, right: 80 },
           xAxis: {
-            max: 'dataMax',
+            max: "dataMax",
             axisLabel: {
-              color: '#fff',
-              formatter: function (n) {
-                return Math.round(n).toLocaleString();
-              },
+              color: "#fff",
+              formatter: (n) => Math.round(n).toLocaleString(),
             },
-            splitLine: {
-              lineStyle: { color: "#444" },
-            },
+            splitLine: { lineStyle: { color: "#444" } },
+            animation: false,
           },
           yAxis: {
-            type: 'category',
+            type: "category",
             data: [],
             inverse: true,
-            animationDuration: 100,
-            animationDurationUpdate: 100,
-            axisLabel: {
-              show: true,
-              fontSize: 14,
-              color: '#fff',
-            },
+            axisLabel: { show: true, fontSize: 13, color: "#fff" },
+            animation: false,
           },
           series: [
             {
               realtimeSort: true,
-              type: 'bar',
+              type: "bar",
               data: [],
               itemStyle: {
-                color: function (param) {
-                  return playerColors[param.name] || '#5470c6';
-                },
+                color: (p) => playerColors[p.name] || "#5470c6",
               },
               label: {
                 show: true,
                 precision: 0,
-                position: 'right',
-                valueAnimation: true,
-                fontFamily: 'monospace',
-                color: '#fff',
-                formatter: function (param) {
-                  return param.value.toLocaleString() + ' XP';
-                },
+                position: "right",
+                valueAnimation: false,
+                fontFamily: "monospace",
+                color: "#fff",
+                formatter: (p) => `${p.value.toLocaleString()} XP`,
               },
+              animation: false,
             },
           ],
-          animationDuration: 0,
-          animationDurationUpdate: 100,
-          animationEasing: 'linear',
-          animationEasingUpdate: 'linear',
-          graphic: {
-            elements: [
-              {
-                type: 'text',
-                right: 100,
-                bottom: 20,
-                style: {
-                  text: '',
-                  font: 'bolder 60px monospace',
-                  fill: 'rgba(255, 176, 0, 0.25)',
-                },
-                z: 100,
-              },
-            ],
-          },
         };
 
-        barChart.setOption(barOption);
+        barChart.setOption(barOption, true);
 
-        function updateCharts() {
-          if (currentFrame >= timestamps.length) {
-            pause();
-            return;
-          }
+        function updateChartsForTime(t) {
+          console.log("Update charts for time:", t);
+          const currentDataFull = allData.filter((d) => d[0] <= t);
+          const curMax = Math.max(...currentDataFull.map((d) => d[2]), 0);
+          const newMax = computeYAxisMax(curMax);
+          if (newMax !== maxXP) maxXP = newMax;
 
-          const currentRelativeTime = timestamps[currentFrame];
-          currentData = allData.filter((d) => d[0] <= currentRelativeTime);
-
-          // Update max XP for dynamic scaling
-          const currentMaxXP = Math.max(...currentData.map(d => d[2]));
-          const newMaxXP = Math.ceil(currentMaxXP * 1.1);
-          
-          // Only update if significantly different to avoid constant rescaling
-          if (newMaxXP > maxXP || newMaxXP < maxXP * 0.9) {
-            maxXP = newMaxXP;
-          }
-
-          // Update line chart with explicit yAxis update
           lineChart.setOption({
-            dataset: [
-              {
-                id: "dataset_raw",
-                source: currentData,
-              },
-            ],
-            title: {
-              subtext: formatRelativeTime(currentRelativeTime),
-            },
-            yAxis: {
-              max: maxXP,
-            },
-          }, false, true);
-
-          // Update bar chart
-          const playersAtTime = timestampedData.get(currentRelativeTime) || [];
-          const top10 = playersAtTime
-            .sort((a, b) => b.xp - a.xp)
-            .slice(0, 10);
-
-          const playerNames = top10.map(p => p.name);
-          const barData = top10.map(p => ({
-            name: p.name,
-            value: p.xp,
-          }));
-
-          barChart.setOption({
-            yAxis: {
-              data: playerNames,
-            },
-            series: [
-              {
-                data: barData,
-              },
-            ],
-            graphic: {
-              elements: [
-                {
-                  style: {
-                    text: formatRelativeTime(currentRelativeTime),
-                  },
-                },
-              ],
-            },
+            dataset: [{ id: "dataset_raw", source: currentDataFull }],
+            title: { subtext: formatRelativeTime(t) },
+            yAxis: { max: maxXP },
           });
 
-          // Update progress slider
-          if (!userIsScrubbingSlider) {
-            progressSlider.value = currentFrame;
-          }
+          const playersAtTime =
+            timestampedData.get(t) ||
+            timestampedData.get(
+              // fallback to nearest earlier timestamp if exact not present
+              currentTimestamps[
+                Math.max(0, currentTimestamps.findIndex((x) => x >= t) - 1)
+              ] ?? t
+            ) ||
+            [];
+          const top10 = playersAtTime
+            .slice()
+            .sort((a, b) => b.xp - a.xp)
+            .slice(0, 10);
+          const playerNames = top10.map((p) => p.name);
+          const barData = top10.map((p) => ({ name: p.name, value: p.xp }));
+          barChart.setOption({
+            yAxis: { data: playerNames },
+            series: [{ data: barData }],
+          });
 
-          const actualDate = new Date(startTime + currentRelativeTime);
+          const actualDate = new Date(startTime + t);
           document.getElementById(
             "currentTime"
-          ).textContent = `${formatRelativeTime(currentRelativeTime)} (${actualDate.toLocaleDateString()} ${actualDate.toLocaleTimeString()}) - Frame ${currentFrame + 1}/${timestamps.length}`;
+          ).textContent = `${formatRelativeTime(
+            t
+          )} (${actualDate.toLocaleDateString()} ${actualDate.toLocaleTimeString()})`;
         }
 
-        function play() {
-          if (isPlaying) return;
-          isPlaying = true;
-          document.getElementById("playBtn").disabled = true;
-          document.getElementById("pauseBtn").disabled = false;
+        function syncFrameFromVirtualTime() {
+          // Find the frame index such that currentTimestamps[idx] <= virtualTime < next
+          let idx = currentTimestamps.findIndex((v) => v > virtualTime);
+          if (idx === -1) idx = currentTimestamps.length - 1;
+          else idx = Math.max(0, idx - 1);
+          currentFrame = idx;
+          if (!userIsScrubbingSlider) progressSlider.value = currentFrame;
+        }
 
-          let lastTime = performance.now();
+        function recalcDownsampling() {
+          // Fewer points at higher speeds; always keep the final timestamp
+          const x = playbackSpeed; // 0.25x .. 25x
+          let target = 1000;
+          if (x >= 2 && x < 5) target = 600;
+          else if (x >= 5 && x < 10) target = 350;
+          else if (x >= 10 && x < 18) target = 220;
+          else if (x >= 18) target = 160;
 
-          function animate() {
-            if (!isPlaying) return;
+          const oldT = virtualTime;
+          currentTimestamps = buildDownsampledTimestamps(
+            baseTimestamps,
+            target,
+            true
+          );
+          progressSlider.max = currentTimestamps.length - 1;
 
-            const now = performance.now();
-            const elapsed = now - lastTime;
-
-            // Frame skipping for speeds below 10ms
-            let framesToSkip = 1;
-            if (speed < 10) {
-              framesToSkip = Math.max(1, Math.floor(10 / speed));
-            }
-
-            if (elapsed >= Math.max(speed, 10)) {
-              lastTime = now;
-              
-              for (let i = 0; i < framesToSkip && currentFrame < timestamps.length; i++) {
-                if (currentFrame >= timestamps.length) {
-                  pause();
-                  return;
-                }
-                currentFrame++;
-              }
-              
-              updateCharts();
-
-              if (currentFrame >= timestamps.length) {
-                pause();
-                return;
-              }
-            }
-
-            animationId = requestAnimationFrame(animate);
-          }
-
-          animate();
+          // Keep virtualTime the same absolute time; adjust frame index
+          syncFrameFromVirtualTime();
+          updateChartsForTime(
+            currentTimestamps[
+              Math.min(currentFrame, currentTimestamps.length - 1)
+            ]
+          );
         }
 
         function pause() {
+          if (!isPlaying) return;
           isPlaying = false;
-          if (animationId) cancelAnimationFrame(animationId);
+          if (rafId) {
+            cancelAnimationFrame(rafId);
+            rafId = null;
+          }
           document.getElementById("playBtn").disabled = false;
           document.getElementById("pauseBtn").disabled = true;
         }
 
-        function reset() {
-          pause();
-          currentFrame = 0;
-          currentData = [];
-          maxXP = 10000;
-          progressSlider.value = 0;
-          lineChart.setOption({
-            dataset: [
-              {
-                id: "dataset_raw",
-                source: currentData,
-              },
-            ],
-            title: {
-              subtext: "",
-            },
-            yAxis: {
-              max: maxXP,
-            },
-          });
-          barChart.setOption({
-            yAxis: {
-              data: [],
-            },
-            series: [{ data: [] }],
-            graphic: {
-              elements: [{ style: { text: '' } }],
-            },
-          });
-          document.getElementById("currentTime").textContent = "";
+        function play() {
+          if (isPlaying || !currentTimestamps || currentTimestamps.length === 0)
+            return;
+
+          isPlaying = true;
+          document.getElementById("playBtn").disabled = true;
+          document.getElementById("pauseBtn").disabled = false;
+
+          // Align virtual time to the current frame's timestamp
+          virtualTime = currentTimestamps[currentFrame];
+
+          // Reset RAF timing - set to null so first frame initializes it
+          lastRafTime = null;
+          if (rafId) cancelAnimationFrame(rafId);
+          rafId = requestAnimationFrame(rafLoop);
         }
 
-        // Speed slider
+        function rafLoop(now) {
+          if (!isPlaying) return;
+
+          // Initialize lastRafTime on first frame without advancing time
+          if (lastRafTime === null) {
+            lastRafTime = now;
+            rafId = requestAnimationFrame(rafLoop);
+            return;
+          }
+
+          const elapsedMs = Math.max(0, now - lastRafTime);
+          lastRafTime = now;
+
+          // Calculate how much "virtual time" should advance based on speed
+          // At 1x speed over ~90 seconds real time, we should cover the full animation
+          const totalAnimationDuration =
+            currentTimestamps[currentTimestamps.length - 1] -
+            currentTimestamps[0];
+          const baseAnimationDurationMs = 90000; // 90 seconds at 1x speed
+          const virtualAdvanceRate =
+            totalAnimationDuration / baseAnimationDurationMs;
+
+          // Advance virtual time
+          virtualTime += elapsedMs * playbackSpeed * virtualAdvanceRate;
+
+          // While the next timestamp is within virtualTime, advance the frame index
+          while (
+            currentFrame < currentTimestamps.length - 1 &&
+            currentTimestamps[currentFrame + 1] <= virtualTime
+          ) {
+            currentFrame++;
+          }
+
+          const lastTs = currentTimestamps[currentTimestamps.length - 1];
+
+          // Clamp virtualTime at the end
+          if (virtualTime >= lastTs) {
+            virtualTime = lastTs;
+            currentFrame = currentTimestamps.length - 1;
+          }
+
+          // Update charts at the current frame's timestamp (monotonic)
+          updateChartsForTime(currentTimestamps[currentFrame]);
+
+          // Sync the progress slider if the user isn't dragging
+          if (!userIsScrubbingSlider) {
+            progressSlider.value = currentFrame;
+          }
+
+          if (currentFrame >= currentTimestamps.length - 1) {
+            pause();
+            return;
+          }
+
+          rafId = requestAnimationFrame(rafLoop);
+        }
+
+        // Also update the reset() to clear any pending RAF and state before repainting.
+        function reset() {
+          // Fully stop animation and clear RAF
+          isPlaying = false;
+          if (rafId) {
+            cancelAnimationFrame(rafId);
+            rafId = null;
+          }
+          document.getElementById("playBtn").disabled = false;
+          document.getElementById("pauseBtn").disabled = true;
+
+          // Reset speed UI
+          const ss = document.getElementById("speedSlider");
+          ss.value = 100;
+          playbackSpeed = 1.0;
+          document.getElementById("speedValue").textContent = "1.00x";
+
+          // Restore timestamps and state
+          currentTimestamps = baseTimestamps.slice();
+          progressSlider.max = currentTimestamps.length - 1;
+
+          currentFrame = 0;
+          progressSlider.value = 0;
+          virtualTime = currentTimestamps[0];
+          lastRafTime = null;
+
+          // Update charts to first frame
+          updateChartsForTime(virtualTime);
+        }
+
         const speedSlider = document.getElementById("speedSlider");
         const speedValue = document.getElementById("speedValue");
-        
         speedSlider.addEventListener("input", (e) => {
-          speed = parseInt(e.target.value);
-          speedValue.textContent = `${speed}ms`;
+          const v = parseInt(e.target.value, 10); // 25..2500
+          playbackSpeed = Math.max(0.25, v / 100);
+          speedValue.textContent = `${playbackSpeed.toFixed(2)}x`;
+          recalcDownsampling();
         });
 
-        // Progress slider
         progressSlider.addEventListener("mousedown", () => {
           userIsScrubbingSlider = true;
         });
-
         progressSlider.addEventListener("mouseup", () => {
           userIsScrubbingSlider = false;
         });
-
         progressSlider.addEventListener("input", (e) => {
-          const newFrame = parseInt(e.target.value);
-          currentFrame = newFrame;
-          updateCharts();
+          currentFrame = parseInt(e.target.value, 10);
+          virtualTime =
+            currentTimestamps[
+              Math.min(currentFrame, currentTimestamps.length - 1)
+            ];
+          updateChartsForTime(virtualTime);
         });
-
-        // Touch support for mobile
         progressSlider.addEventListener("touchstart", () => {
           userIsScrubbingSlider = true;
         });
-
         progressSlider.addEventListener("touchend", () => {
           userIsScrubbingSlider = false;
         });
@@ -750,7 +824,20 @@
         window.addEventListener("resize", () => {
           lineChart.resize();
           barChart.resize();
+          lineChart.setOption({
+            xAxis: { axisLabel: { interval: computeXAxisInterval(lineChart) } },
+          });
         });
+
+        // Initial paint
+        (function initFirstFrame() {
+          currentFrame = 0;
+          currentTimestamps = baseTimestamps.slice();
+          progressSlider.max = currentTimestamps.length - 1;
+          progressSlider.value = 0;
+          virtualTime = currentTimestamps[0];
+          updateChartsForTime(virtualTime);
+        })();
       }
 
       createCharts();
