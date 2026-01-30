@@ -90,7 +90,7 @@ export default defineConfig({
    * - Repository: https://github.com/username/portfolio → base: '/portfolio'
    * - Custom domain: https://example.com → base: undefined
    */
-  base: SITE_URL ? undefined : "/portfolio",
+  base: SITE_URL ? undefined : "/garand.dev",
 
   /**
    * Environment variables schema (Astro v5+)
