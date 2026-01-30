@@ -12,29 +12,15 @@
  * - Markdown: Syntax highlighting with Shiki
  *
  * Setup:
- * 1. Copy .env.example to .env
- * 2. Set SITE_URL and other environment variables
- * 3. Run `npm run dev` for development or `npm run build` for production
+ * 1. Site configuration is hardcoded in src/config.ts
+ * 2. Run `npm run dev` for development or `npm run build` for production
  *
  * @see https://astro.build/config
  */
 
 import { defineConfig, envField } from "astro/config";
-import { loadEnv } from "vite";
 import mdx from "@astrojs/mdx";
 import sitemap from "@astrojs/sitemap";
-
-/**
- * Load environment variables from .env file
- *
- * Uses Vite's loadEnv to read environment variables at build time.
- * Falls back to 'production' if NODE_ENV is not set.
- */
-const { SITE_URL } = loadEnv(
-  process.env.NODE_ENV || "production",
-  process.cwd(),
-  "",
-);
 
 /**
  * Astro configuration object
@@ -63,20 +49,18 @@ export default defineConfig({
   /**
    * Site URL
    *
-   * Base URL for the site, loaded from SITE_URL environment variable.
+   * Base URL for the site.
    * Required for:
    * - Sitemap generation
    * - Canonical URLs
    * - Open Graph tags
    * - RSS feeds
    *
-   * Set SITE_URL in your .env file (e.g., https://example.com)
-   *
    * For GitHub Pages:
    * - Using custom domain: https://garand.dev (no base needed)
    * - Using github.io: https://antonygarand.github.io
    */
-  site: SITE_URL || "https://garand.dev",
+  site: "https://garand.dev",
 
   /**
    * Base path
@@ -98,6 +82,9 @@ export default defineConfig({
    * Defines type-safe environment variables with validation and defaults.
    * All variables are client-side accessible and public.
    *
+   * Note: Site configuration is now hardcoded in src/config.ts.
+   * These defaults are maintained for compatibility.
+   *
    * Categories:
    * - Site: URL, language, title, description
    * - Author: Name, title, bio, email, location
@@ -109,7 +96,7 @@ export default defineConfig({
       SITE_URL: envField.string({
         context: "client",
         access: "public",
-        default: "https://example.com",
+        default: "https://garand.dev",
       }),
       SITE_LANGUAGE: envField.string({
         context: "client",
@@ -119,20 +106,19 @@ export default defineConfig({
       SITE_TITLE: envField.string({
         context: "client",
         access: "public",
-        default: "Professional Portfolio",
+        default: "Antony Garand's site",
       }),
       SITE_DESCRIPTION: envField.string({
         context: "client",
         access: "public",
-        default:
-          "Engineering leader specializing in system architecture, technical decision-making, and delivering measurable business impact.",
+        default: "Software thinkerer of all scales, from startups to Amazon!",
       }),
 
       // Author information
       SITE_AUTHOR_NAME: envField.string({
         context: "client",
         access: "public",
-        default: "Your Name",
+        default: "Antony Garand",
       }),
       SITE_AUTHOR_TITLE: envField.string({
         context: "client",
@@ -142,35 +128,34 @@ export default defineConfig({
       SITE_AUTHOR_BIO: envField.string({
         context: "client",
         access: "public",
-        default:
-          "Engineering leader focused on solving complex technical challenges through thoughtful architecture and pragmatic trade-off analysis.",
+        default: "Software thinkerer of all scales, from startups to Amazon!",
       }),
       SITE_AUTHOR_EMAIL: envField.string({
         context: "client",
         access: "public",
-        default: "hello@example.com",
+        default: "hello@garand.dev",
       }),
       SITE_AUTHOR_LOCATION: envField.string({
         context: "client",
         access: "public",
-        default: "",
+        default: "Quebec, Canada",
       }),
 
       // Social media links (empty string = hidden)
       SOCIAL_GITHUB: envField.string({
         context: "client",
         access: "public",
-        default: "",
+        default: "https://github.com/AntonyGarand",
       }),
       SOCIAL_LINKEDIN: envField.string({
         context: "client",
         access: "public",
-        default: "",
+        default: "https://linkedin.com/in/AntonyGarand",
       }),
       SOCIAL_TWITTER: envField.string({
         context: "client",
         access: "public",
-        default: "",
+        default: "https://twitter.com/antogarand",
       }),
       SOCIAL_MASTODON: envField.string({
         context: "client",
@@ -232,5 +217,5 @@ export default defineConfig({
     "/projects/metaballs": "/metaballs/index.html",
     "/projects/metaballs/gallery": "/metaballs/gallery.html",
     "/projects/sailing": "/sailing/index.html",
-  }
+  },
 });
