@@ -1,0 +1,217 @@
+---
+title: "JavaScript: Async math is hard"
+description: "Async math can cause bugs"
+publishDate: 2018-06-11
+updatedDate: 2018-06-12
+tags:
+  - challenge
+  - javascript
+  - asyncawait
+  - es7
+draft: false
+---
+
+# Challenge
+
+While we're glad ES7 brings us `async` and `await`, asynchronous code still isn't as straightforward as it could be.
+Try guessing what the following snippet should return, then head up to the writeup!
+
+```javascript
+function sleepOneSecondAndReturnTwo() {
+    return new Promise(resolve =>  {
+        setTimeout(() => { resolve(2); }, 1000);
+    });
+}
+
+let x = 0;
+
+async function incrementXInOneSecond() {
+    x += await sleepOneSecondAndReturnTwo();
+    console.log(x);
+}
+
+incrementXInOneSecond();
+x++;
+console.log(x);
+```
+
+This can be simplified quite a bit due to how asynchronous code is handled within JavaScript.
+
+The `setTimeout` and creation of a new function is not necessary, as the asynchronous part of the execution will be delayed even if there is no delay in the promise resolution.  
+`await` will also convert non-promises to resolved promise, as described on [MDN's await page](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/await)
+
+> If the value of the expression following the await operator is not a Promise, it's converted to a resolved Promise.
+
+`await 2` is therefore the shorthand syntax of `await Promise.resolve(2);`.
+
+This leads us to the following code:
+
+```javascript
+let x = 0;
+
+async function incrementX() {
+    x += await 2;
+    console.log(x);
+}
+
+incrementX();
+x++;
+console.log(x);
+```
+
+# Writeup
+
+Let me preface this by giving out the inspiration of this post, which is [this](https://www.youtube.com/watch?v=bfxglBVSNDI) great video by Jake Archibald.
+I found the content so interesting I'm writing about it here, but all credits goes to Jake!
+
+## Answer
+
+Here is the short version of the previous challenge:
+```javascript
+let x = 0;
+
+async function incrementX() {
+    x += await 2;
+    console.log(x);
+}
+
+incrementX();
+x++;
+console.log(x);
+```
+
+As you may have found out, the output of this script is `1` and `2`, instead of the `1` and `3` we could expect.
+
+Let's look at how the synchronous part of the code will be executed:
+```javascript
+let x = 0;
+```
+
+Quite easy, `x = 0`!
+
+Now, inside the async function, things gets interesting.
+For an easier visualisation, I will *expand* the [addition assignment](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Assignment_Operators#Addition_assignment) to its full form, as it primarly is syntastic sugar:
+```javascript
+x += await 2;
+```
+
+Becomes
+```javascript
+x = x + await 2;
+```
+
+As we are in an asynchronous function, once we reach the `await` statement, we will change our execution context.
+A copy of the `runningContext` will be created, named `asyncContext`.
+When the execution of our async function will resume, this context will be used instead of the currently running context.
+
+This is the behavior defined in the [EcmaScript spec when running an asynchronous function](https://tc39.github.io/ecma262/#sec-async-functions-abstract-operations-async-function-start).
+
+![Execution Contexts creation](/images/blog/dflig534m7phna8qz37j-1.png)
+
+Since we are now *awaiting* a variable, the remaining content of the function will not be executed until the promise is resolved, and the execution stack is empty.
+
+![Execution stack](/images/blog/ztazp0ppdjdhzqai2s2z-1.png)
+
+We will therefore continue with the synchronous execution of the code.
+
+```javascript
+x++;
+```
+`x` is now 1!  
+The previous value of X was 0 in the running execution stack, therefore it gets incremented to 1.  
+
+![Running context value - X = 1](/images/blog/l2j4xwgw40lsnx52f4ed-1.png)
+```javascript
+console.log(x)
+```
+Print `1` into the console
+
+Our current execution is completed, therefore we can now get back to the asynchronous execution.  
+`await 2` is the shorthand syntax of `await Promise.resolve(2)`, which immediatly gets resolved.
+
+The async execution context still has `x` with its previous value of `0`, so the following code gets executed:
+```javascript
+x = x + 2;
+```
+Which is the same as the following, in our current execution context:
+```javascript
+x = 0 + 2;
+```
+![Async execution context values - X = 0 + 2](/images/blog/q3zlfmydvl9grr2950yl-1.png)
+
+The async execution context now has X with a value of 2.  
+![Async execution context values - X = 2](/images/blog/phzk73lgam8hwayxgof6-1.png)
+
+Finally, as we now enter a new block of synchronous code, both execution contexts will now merge, the running execution context acquiring `x`'s new value of `2`.
+![Execution contexts merging](/images/blog/r23z11fbjurayqpf2qbb-1.png)
+
+```javascript
+console.log(x)
+```
+`2` Is finally printed into the console.
+
+## Real World
+
+What does this mean for us, developers?  
+The content of this post may seem like esoteric knowledge, but it was actually initially found with a real scenario.
+[This](https://www.reddit.com/r/javascript/comments/8lih82/javascript_operator_causing_race_conditions_when/) reddit post has a snippet which can be summarized with the following:
+
+```javascript
+let sum = 0;
+
+function addSum() {
+    [1,2,3,4,5].forEach(async value => {
+        sum += await value;
+        console.log(sum);
+    });
+}
+
+addSum();
+
+setTimeout(() => { console.log(sum); }, 1000);
+```
+As you probably know, the output of the following code will be `1`, `2`,`3`,`4`,`5`, and finally after one second, `5`.
+Removing the `await` keyword instead returns `15`, which is odd behavior if we're not familiar with the content of this post. 
+
+Replace `await value` with `await getSomeAsynchronousValueFromAnApi()` and you get a real world scenario in which hours of debugging and head scratching would most likely have been required!
+
+## Solutions
+
+There are many workarounds possible to prevent this from happening, here are few of those.  
+Here is the original code I will replace:
+
+```javascript
+x += await 2;
+```
+
+### Solution 1: Awaiting in a variable
+```javascript
+const result = await 2;
+x += result;
+```
+With this solution, the execution contexts will not share the `x` variable, and therefore it will not be merged.
+
+### Solution 2: Adding to X after awaiting
+
+```javascript
+x = await 2 + x;
+```
+This solution is still error-prone if there are multiple await statements in the operation, but it does prevent the overwriting of X in multiple execution contexts!
+
+# Conclusion
+Await is great, but you can't expect it to behave like synchronous code!  
+Unit tests and good coding practices would help preventing those odd scenarios from reaching a production environment.
+
+Please do write comments with your different workarounds and best practices around this behavior, I'd love to have your opinion on the subject!
+
+# References
+
+EcmaScript:
+* [Promise Executor](http://www.ecma-international.org/ecma-262/6.0/#sec-promise-executor)
+* [Async function](https://tc39.github.io/ecma262/#sec-async-functions-abstract-operations-async-function-start)
+
+Youtube: [JS quiz: async function execution order](https://www.youtube.com/watch?v=bfxglBVSNDI)
+Reddit: [Original inspiration of this post](https://www.reddit.com/r/javascript/comments/8lih82/javascript_operator_causing_race_conditions_when/)
+
+
+<small>Original on [Gitlab](https://gitlab.com/AntonyGarand/javascript-quirks/blob/master/writeups/3-async_maths.md)</small>

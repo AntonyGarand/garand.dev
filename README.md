@@ -1,3 +1,20 @@
+Hey!
+This is my new blog.
+It's a fork from the Case theme available [here](https://github.com/erlandv/case), and still in progress.
+
+Thanks for reading my repo!
+
+Todos:
+- Use Bun instead of Node, why not
+- Configure github page
+- Ensure existing links to my site are properly redirected
+- Add content
+  - Add resume
+  - Import blog posts, articles I've written
+  - Add any fun snippets worth discussing
+  - Share my side projects, any fun technical notes
+
+---
 # Case — A Case-Study-First Portfolio Theme for Astro
 
 [![Built with Astro](https://astro.badg.es/v2/built-with-astro/tiny.svg)](https://astro.build)

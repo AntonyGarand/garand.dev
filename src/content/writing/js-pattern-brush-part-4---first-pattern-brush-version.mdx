@@ -1,0 +1,297 @@
+---
+title: "JS Pattern brush: Part 4 - First pattern brush version"
+description: "This is an article series in which we will build a pattern brush in JavaScript. This fourth part covers warping an SVG over our Bezier curve!"
+publishDate: 2019-01-29
+updatedDate: 2020-01-17
+tags:
+  - javascript
+  - svg
+  - graphics
+draft: false
+---
+
+# Introduction
+
+And here we are, in the fourth part of the JS Pattern brush series!
+
+In the [last post](https://dev.to/antogarand/js-pattern-brush-part-3---finding-the-length-of-a-curve-3d60), we learned how to find out the length of our curve.
+
+Thanks to this knowledge, in this post, we will learn how to warp any SVG on the curve itself! While this version will have many limitations, it is the first step in which we get an actual brush!
+
+# Table of contents
+
+  <ul>
+    <li>[Introduction](#introduction)</li>
+    <li>[Table of contents](#table-of-contents)</li>
+    <li>[Making patterns](#making-patterns)</li>
+    <ul>
+      <li>[Choosing a pattern](#choosing-a-pattern)</li>
+      <li>[Listening to the event](#listening-to-the-event)</li>
+    </ul>
+    <li>[Warping an SVG](#warping-an-svg)</li>
+    <li>[Conclusion](#conclusion)</li>
+  </ul>
+
+# Making patterns
+
+The first thing we need to actually have something to warp is patterns. It isn't a pattern brush without proper patterns, isn't it?
+
+Let's start by making three simple patterns:
+
+![Three squares with various lines](/images/blog/9ct6mq5yk4xjz7vfqiag-1.png)
+
+These will help us ensure the curves are smooth, while remaining simple shapes.
+
+Before we make the actual shapes, I modified `index.html`, adding a `div` which will contain the SVG's.
+
+```html
+<div id="svgContainer"></div>
+```
+
+Now, onto the actual shapes: 
+
+First, the square with the diagonal lines:
+
+```html
+<svg id="diagonal" xmlns="http://www.w3.org/2000/svg" width="50" height="50">
+    <rect x="0" y="0" width="50" height="50" rx="0" ry="0"
+          fill="#ede" stroke="#000" stroke-width="2"/>
+    <line x1="0" x2="50" y1="0" y2="50" fill="none" stroke="#000"/>
+    <line x1="50" x2="0" y1="0" y2="50" fill="none" stroke="#000"/>
+</svg>
+```
+
+This is a simple square, made with `rect`, and two `lines` going to the middle.
+
+```html
+<svg id="horizontal" xmlns="http://www.w3.org/2000/svg" width="50" height="50">
+    <rect x="0" y="0" width="50" height="50" rx="0" ry="0"
+          fill="#ede" stroke="#000" stroke-width="2"></rect>
+    <line x1="0" x2="50" y1="10" y2="10" fill="none" stroke="#000"></line>
+    <line x1="0" x2="50" y1="20" y2="20" fill="none" stroke="#000"></line>
+    <line x1="0" x2="50" y1="30" y2="30" fill="none" stroke="#000"></line>
+    <line x1="0" x2="50" y1="40" y2="40" fill="none" stroke="#000"></line>
+</svg>
+```
+
+This one is a square, with horizontal lines inside itself.
+
+```html
+<svg id="vertical" xmlns="http://www.w3.org/2000/svg" width="50" height="50">
+    <rect x="0" y="0" width="50" height="50" rx="0" ry="0"
+          fill="#ede" stroke="#000" stroke-width="2"></rect>
+    <line x1="10" x2="10" y1="0" y2="50" fill="none" stroke="#000"></line>
+    <line x1="20" x2="20" y1="0" y2="50" fill="none" stroke="#000"></line>
+    <line x1="30" x2="30" y1="0" y2="50" fill="none" stroke="#000"></line>
+    <line x1="40" x2="40" y1="0" y2="50" fill="none" stroke="#000"></line>
+</svg>
+```
+And finally, this last one is a square with vertical lines!
+
+---
+
+As we created more SVG elements, we need to update our selector for the canvas SVG.
+
+I added the `id` attribute on it in `index.html`, and updated its reference in `control.js`:
+
+```html
+<svg width="100%" height="100%" id="canvas">
+```
+```javascript
+const [wrapper] = $('#canvas');
+```
+
+## Choosing a pattern
+
+Now that we have our three patterns, let's make them a bit more interactive, by being able to click on them and select one!
+
+I will do this using radio buttons [`radio`](https://developer.mozilla.org/en-US/docs/Web/HTML/Element/input/radio), and a [`label`](https://developer.mozilla.org/en-US/docs/Web/HTML/Element/label) wrapping the SVG itself:
+
+```html
+
+<label for="diagonalOption">
+    <input type="radio" id="diagonalOption" value="diagonal" name="currentSVG" checked="checked"/>
+    <svg id="diagonal" xmlns="http://www.w3.org/2000/svg" ... />
+</label>
+
+<label for="horizontalOption">
+    <input type="radio" id="horizontalOption" value="horizontal" name="currentSVG"/>
+    <svg id="horizontal" xmlns="http://www.w3.org/2000/svg" ... />
+</label>
+
+<label for="verticalOption">
+    <input type="radio" id="verticalOption" value="vertical" name="currentSVG"/>
+    <svg id="vertical" xmlns="http://www.w3.org/2000/svg" ... />
+</label>
+```
+
+Now, we can click on the SVGs to select them!
+
+One last thing I want to do before continuing is hiding the actual radio button: I don't really care which one is active, therefore I'll hide it:
+
+```html
+<style>
+    input[type=radio] {
+        display: none;
+    }
+    input[type=radio] + svg {
+        margin: 1px;
+        cursor: pointer;
+    }
+    input[type=radio]:checked + svg {
+        border: 1px solid lightgreen;
+        margin: 0;
+    }
+</style>
+```
+
+I also gave the currently selected SVG a light green border, this way we still know which one is active!
+
+![SVG choices with highlight](/images/blog/ho9tlvbqbbtiks9d5kam-1.png)
+
+## Listening to the event
+
+Now that we can pick our different patterns, we need to listen to the actual change event, and find out which svg was rendered.
+
+First, let's make an array which will contain our choices, and the default selection:
+
+```javascript
+const patternsRadioButton = $('input[type=radio][name=currentSVG]');
+let [currentPattern] = $('input[type=radio][name=currentSVG]:checked');
+```
+
+Then, we can add an event listener on the radio buttons, which will change the `currentPattern` variable:
+
+```javascript
+patternsRadioButton.forEach(input => {
+  input.addEventListener('click', (v)=>{
+    [currentPattern] = $(`#${v.target.value}`);
+    redrawCurve();
+  });
+});
+```
+
+In here, we changed the `currentPattern`, and called the `redrawCurve` method, to update the canvas.
+
+
+# Warping an SVG
+
+In this segment, I'll use [WarpJS](https://github.com/benjamminf/warpjs), which will feed me (X, Y) coordinates, and move them to the new (X, Y) coordinates I'm returning.
+
+
+Before starting, I created the `visuals/pattern_brush.js` file, imported it in `control.js` and added its warping function to the `redrawCurve` function.  
+I also added the `warp.js` script before my own code:
+```html
+<script src="https://unpkg.com/warpjs@1.0.8/dist/warp.js"></script>
+```
+
+In the `pattern-brush.js` file, I created three things:
+
+```javascript
+const Warp = window.Warp;
+
+const svgns = "http://www.w3.org/2000/svg";
+let svgGroup = document.createElementNS(svgns, 'g');
+
+export function warpToCurve(curve, svgModel, svgWrapper) {}
+```
+
+First, the Warp declaration. As we're using a `module` for our code, it's better to explicitly map this variable, instead of expecting it to be available.
+
+Second, the wrapping SVG `g`roup which will contain our various elements.
+
+Finally, the warping function itself. This function takes three arguments:  
+  1. The Bezier `curve` we'll be warping on
+  2. The svg model, our previously created SVG's
+  3. The SVG Wrapper, or where we'll actually place our group.
+
+The first thing we'll do in our function is find out how many SVG's we need to fill the curve.  
+We can do this by comparing the length of the curve with the the size of the SVG:
+
+```javascript
+const width = svgModel.getAttribute('width') || 1;
+const height = svgModel.getAttribute('height') || 1;
+
+const count = Math.ceil(curve.length / width);
+```
+Here, we use `Math.ceil` instead of `floor` or `round` to ensure we have enough length to fill the curve, otherwise the end of it could be empty.
+I also added the ` || 1` to ensure we don't get a division by `0` on the count, and get an infinite loop later on.
+
+Then, we'll create a loop, and clone our svg model:
+
+```javascript
+const svgs = [];
+for (let i = 0; i < count; i++) {
+  const newSvg = svgModel.cloneNode(true);
+  const warp = new Warp(newSvg);
+  warp.interpolate(4);
+}
+```
+
+We start by cloning the model, as WarpJS will modify the original element we feed it.  
+Then, we create our Warp instance from the cloned element, and `interpolate` it.  
+The interpolate method will "break" the curve up to the given size, the higher the number, the more points we will be fed later on, and the more precise the cut will be.
+
+Next, we perform the actual transformation:
+```javascript
+warp.transform(([x, y]) => {
+  let t = (x + i * width) / curve.length;
+  if (t < 0) t = 0;
+  if (t > 1) t = 1;
+  const point = curve.point(t);
+  const normal = curve.normal(t);
+
+  const offsetX = (normal.x * y);
+  const offsetY = (normal.y * y);
+
+  const newX = point.x + offsetX;
+  const newY = point.y + offsetY;
+
+  return [newX, newY];
+});
+
+svgs.push(newSvg);
+```
+Here, we map the points, from their `x` and `y` coordinates, to their new position on the curve.  
+In order to get the new position, we start by finding the `time` of the curve we're at, based off the length of the curve and the width of the element itself.  
+We clamp this value between `0` and `1` to ensure we don't go over the curve. This approach has few downsides, as the texture will be "Squashed" at the time `1`, but it's good enough for the moment!
+
+Then, we find the point and normal of the curve for our newly found time.
+
+Finally, we find the actual position, by adding the `point` and the `offset` we just found!
+
+By returning the new coordinates, the given SVG element will be correctly warped!
+
+```javascript
+  while (svgGroup.hasChildNodes()) {
+    svgGroup.removeChild(svgGroup.firstChild);
+  }
+
+  svgs.forEach(element => svgGroup.appendChild(element));
+
+  if (!svgWrapper.contains(svgGroup)) {
+    svgWrapper.insertBefore(svgGroup, svgWrapper.children[3]);
+  }
+```
+
+Now, we end up by clearing up the svg group if it had childs, and adding the new svg's we created to it.
+We also ensure the svg group is contained in the given wrapper, and add it if it isn't.
+
+Note that I insert the group at the third position of the wrapper: This is so it is rendered before most other elements.  
+If it was simply added, it would be over all of our points, normals and control points.
+
+![Warped svg](/images/blog/l1e8e2vqd2zu92bpcxkq-1.png)
+
+# Conclusion
+
+There we are, after 4 blog posts, we have our first working pattern brush!
+
+As always, the source code is on [Gitlab](https://gitlab.com/AntonyGarand/pattern-brush/tree/part-4-pattern-v1), it's ready to experiment with!
+
+---
+
+As you probably noticed, the pattern on the brush can be stretched or squished, depending on how condensed are the points on the curve:
+
+![Streched element](/images/blog/uksyyyam7cqjphzkabms-1.png)
+
+We'll work on fixing this in the next posts!

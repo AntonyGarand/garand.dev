@@ -1,0 +1,207 @@
+---
+title: "SVG Metaballs"
+description: "I find metaballs fascinating: Pure shapes fusing and morphing with each other, making a weird gooey r..."
+publishDate: 2020-12-07
+tags:
+  - javascript
+  - svg
+  - metaballs
+draft: false
+---
+
+I find [metaballs](https://duckduckgo.com/?q=metaballs&ia=images&iax=images) fascinating: Pure shapes fusing and morphing with each other, making a weird gooey result. Such a simple idea, yet I had no idea how they could be implemented for a very long time.
+
+I remember seeing an amazing interactive gallery using these metaballs on the [canva.com](https://web.archive.org/web/20190623031727if_/https://www.canva.com/) website:
+
+![Gallery using metaballs](/images/blog/n2z7fig532dtoz4prtto.gif)
+<small>Note that the gallery doesn't work when following the canva.com link directly, but it does work when accessing it from the web archive website.</small>
+
+In this post, I'll share with you a bit of my path to enlightenment with these balls, and how I implemented them on my own, using only two SVG filters.
+
+If you want to check the final result first, check out the playground on my website: [https://garand.dev/projects/metaballs/](https://garand.dev/projects/metaballs/)
+
+# Getting started
+Let's start with the obvious questions: *What are metaballs?* The [wikipedia](https://en.wikipedia.org/wiki/Metaballs) definition isn't quite clear:
+> In computer graphics, metaballs are organic-looking n-dimensional isosurfaces, characterised by their ability to meld together when in close proximity to create single, contiguous objects.  
+
+Simplified, metaballs are _blobs_, which can feel some sort of attraction within each other, and can fuse into a single entity whenever they're near each other.
+
+# Implementation 1 - FabricJS and geometric operations
+To skip this section and go straight to the final solution, click [here](#implementation-2)!
+
+The first idea I had was to use a purely geometric approach, inspired by [this](http://shspage.com/aijs/en#metaball) illustrator plugin: The two blobs (A and B) could be bridged with a rectangle (E), and then I could "subtract" two circles (C and D) to make a blobby feeling!
+
+![Exploded view of the blob attempt](/images/blog/g0pbvjnyxvbk712fzsnp.png)
+
+I actually implement this a while back, using FabricJS, you can find the playground [here](https://antonygarand.github.io/fabricjs-metaballs/) ([source code](https://github.com/AntonyGarand/fabricjs-metaballs)), and it did look fine!  
+![Initial implementation of the metaballs](/images/blog/tohuqu9b5tj9ms5ivmjs.png)
+You can actually see the different segments when it didn't fully update between frames, which I find interesting:
+![Broken bridge between blobs](/images/blog/gi5wquj83qes3m1u83j5.png)
+
+But it had its share of issues: 
+ - Performance followed an exponential growth  
+
+As each element had to compare and create a bridge for each neighbor, it didn't scale as well as other approaches.
+ - There was no middle ground between "attached" and "detached"
+  
+There were no clean ways of creating a magnetic type of attractiveness where the balls would reach for each other, which I absolutely wanted.
+ - It only worked with circles, or ovals
+ - It didn't handle well having multiple collisions  
+
+When a metaball was within reach of few others, each bridge was independent of each other, giving odd results when they overlapped
+![Alt Text](/images/blog/aghqy8xn21ba2a8g5o5y.png)
+
+Therefore, I ditched this approach, and looked for a better solution.
+
+# Implementation 2 
+Two years later, looking through my old experiments on github, I found the project and decided to tackle it once more, but this time solving the issues I had with the first version.
+
+I found [this post](https://blobs.webflow.io/) on webflow from [@vinchubang](https://twitter.com/vinchubang) which used `blur` and `contrast` to achieve their blobs: First, blurring the blobs themselves, and then setting the brightness and contrast to a high value to remove the regions with a low opacity while increasing the visibility of others with a high-enough opacity.
+![Creating two balls](/images/blog/5ruqc1scgdz8baomg7k8.png)
+![Adding a blur filter](/images/blog/q0pn16xp05rjoa8dgkv9.png)
+![Adding excessive contrast](/images/blog/ptmv7cvfw4uo6k9djju5.png)
+
+One big limitation with the use of the `contrast` filter is the requirement of uniform background, it doesn't support transparency or any type of dynamic coloring. These are limitations I'd like to get rid of, because I can!
+
+## Starting out
+
+With this new knowledge in mind, there are few essential steps for the technique to work:
+ 1. Blur the elements
+ 2. Set the opacity of everything with an opacity below a threshold to 0, aka. remove it
+ 3. Set the opacity of everything with an opacity equal or above the threshold to 1, making it fully visible.
+
+In these step, `opacity` refers to the final opacity of the different layers, once they were [alpha blended](https://en.wikipedia.org/wiki/Alpha_compositing#Alpha_blending) together, where the more layers of elements there are, the more opaque the color.
+
+## The Blur
+
+I started with the first step, blurring the elements. To do so, I used the [feGaussianBlur](https://developer.mozilla.org/en-US/docs/Web/SVG/Element/feGaussianBlur) filter.
+
+```html
+<svg height="100%" width="100%">
+    <defs>
+        <filter id="gooify" width="400%" x="-150%" height="400%" y="-150%">
+            <feGaussianBlur id="blurElement" in="SourceGraphic" stdDeviation="20" result="blur" />
+        </filter>
+    </defs>
+    <g filter="url(#gooify)">
+        <circle cx="200" cy="200" r="90" fill="red" />
+        <circle cx="400" cy="200" r="90" fill="red" />
+    </g>
+</svg>
+```
+Note that I added a lot of space for the width and height of the filter for the blur to avoid being cut once it reaches the edge.  
+
+As expected, this resulted in blurry red circles!
+
+![Two blurry red circles](/images/blog/83bery6wi9s3t6eeprlt.png)
+
+## The opacity
+
+The next step was to juggle with the opacity without requiring a solid background.  
+After looking at the [available filters](https://developer.mozilla.org/en-US/docs/Web/SVG/Element/filter#See_also), I ended up using [feColorMatrix](https://developer.mozilla.org/en-US/docs/Web/SVG/Element/feColorMatrix), which can manipulate the alpha data independently from the other channels!
+
+As its name implies, it uses a [matrix](https://en.wikipedia.org/wiki/Matrix_(mathematics)), essentially a 2d array, where each value controls a single parameter.
+There are 4 rows, representing [RGBA](https://en.wikipedia.org/wiki/RGBA_color_model), and 5 columns, one per RGBA input and one to control perform an additional shift.  
+While it does sound kind of complex, in this case all that matters are two values, the two last ones, which I'll explain in more details shortly.  
+There are only two values which matter to get the desired effect:
+
+- The penultimate value
+This value multiplies the alpha layer (opacity) by its value, allowing us to increase the opacity of the blurred image.
+
+- The last value
+This value is a final shift via an addition: It adds the value by the amount specified
+
+With these two value, we can mimic an opacity threshold, by setting a high multiplier, and a small negative shift value.
+
+The exact formula would to get our result is `originalAlpha * multiplier + shift`, where one `shift` unit is equivalent to `100%` opacity.
+I've made a [quick spreadsheet](https://docs.google.com/spreadsheets/d/1E3XxWY22yPE4cCIiQvct8lYb7q-V1VgUdyXHiUtesRg/edit?usp=sharing) to demonstrate the impact of both values on the resulting opacity:
+![Spreadsheet image](/images/blog/oxyckw3y0nae26lmvmb9.png)
+
+As the opacity is 8 bits of data, its maximum value is `255`, so using it as the multiplier should give us a perfect granularity for our threshold. Then, for a threshold of 60%, we can define a shift of `-153`!
+
+![Alt Text](/images/blog/9c3jsam1wrtutrdv2gps.png)
+
+Let's start with an [Identity Matrix](https://en.wikipedia.org/wiki/Identity_matrix), which does no changes on the incoming image. Then, adding the two modifiers into the matrix, we get a crisp looking result:
+```html
+<filter id="gooify" width="400%" x="-150%" height="400%" y="-150%">
+    <feGaussianBlur in="SourceGraphic" stdDeviation="20" result="blur" />
+    <feColorMatrix in="blur" mode="matrix" values="1 0 0 0 0
+                                                   0 1 0 0 0
+                                                   0 0 1 0 0
+                                                   0 0 0 255 -153" />
+</filter>
+```
+![Crisp metaballs](/images/blog/kqejol81g5itxghcndfj.png)
+
+Now, notice that there are only fully opaque or fully transparent pixels. Using a multiplier of 255 has the bad side effect of removing all forms of [anti aliasing](https://en.wikipedia.org/wiki/Spatial_anti-aliasing) for the blobs.  
+To add a bit of smoothness, I added reduced the values by an order of magnitude, setting the multiplier to `25` and the shift to `-15`:
+
+![Smooth metaballs](/images/blog/anu9uioao8vvh7rlkp1x.png)
+
+This is a lot smoother, even though some of the edges of the bridges are a bit blurry!  
+I'm sure I could get a better result by tweaking the values, but it's good enough for the moment. 
+
+# Interactivity
+
+While having metaballs is nice, it's not fun if we can't interact with them!
+I won't go for a full gallery just yet, but start with simple drag and drop controls with the mouse.  
+The code should be self-explanatory: There is one variable to store the element being moved, and another one to store the X and Y offset of the original click, as well as the `mousedown`, `mousemove` and `mouseup` events to move the circles.
+Ideally, I would also add the mobile event  `touch[start|move|end]`, but click only will do for this proof of concept!
+
+```javascript
+const $ = document.querySelector.bind(document);
+const $$ = document.querySelectorAll.bind(document);
+
+// Moving the circles using the mouse
+let isMoving = false;
+const offset = { x: 0, y: 0 };
+$$("circle").forEach(circle => {
+    circle.addEventListener("mousedown", (e) => {
+        isMoving = circle;
+        offset.x = e.clientX - circle.attributes.cx.value;
+        offset.y = e.clientY - circle.attributes.cy.value;
+    })
+});
+const svg = $("svg");
+svg.addEventListener("mousemove", (e) => {
+    if (!isMoving) return;
+    const newPosition = {
+        x: e.clientX - offset.x,
+        y: e.clientY - offset.y
+    }
+    isMoving.setAttribute('cx', newPosition.x);
+    isMoving.setAttribute('cy', newPosition.y);
+})
+svg.addEventListener("mouseup", () => isMoving = false)
+```
+I also added few sliders to play with the values in real time, feel free to check the source code for the implementation if you're interested.
+
+[Here is the live playground](https://garand.dev/projects/metaballs/) for the interested!
+
+![Interactive metaballs](/images/blog/3g58m6dgia7yf1fmounp.gif)
+
+# Summary
+Metaballs are a fascinating type of object, and now thanks to these two SVG filters, you can add them anywhere!
+Unlike the geometric approach I initially attempted, using filters has many benefits:
+ - Supports any shape, keeping in mind it will be slightly altered once blurred
+ - Performant: Has a very small cost to increasing the amount of objects!  
+Only requiring one gaussian blur per item, and running the color matrix filter once, very far from an exponential growth
+ - Supports partial bridges, giving a _magnetic_ effect
+
+And unlike the contrast method webflow used, it does support a transparent background, end even blending colors of the blobs!
+
+Right now, these metaballs are still only a proof of concept, but I have few interesting projects I'd like to do with them, such as a lava lamp and a gallery similar to the one Canva did.
+
+Keep in mind that I'm not the first one to find this way to make metaballs using the `blur` and `colormatrix` filters. While looking at other projects to do with this technique, I found [this post](https://codepen.io/chrisgannon/post/how-to-make-an-svg-lava-lamp) from Chris Gannon on making a lava lamp and [this one](https://css-tricks.com/gooey-effect/#making-things-stick) from Lucas Bebber on a gooey menu, both of which are over 5 years old!  
+Things like this reminds me that we're all doomed to reinvent the wheel at some point, and that great minds think alike!
+
+# References
+- Wikipedia - [Metaballs](https://en.wikipedia.org/wiki/Metaballs)  
+- Illustrator plugin for Metaballs - [shspage Metaballs](http://shspage.com/aijs/en#metaball)  
+- Helpful math for the above - [Given two touching circles, find position of a third circle of known radius so that it touches them](https://math.stackexchange.com/a/2294532)  
+- Geometric metaballs using `paths` -  [Metaballs](https://varun.ca/metaballs/)
+- Alternative technique - [Metaballs and Marching Squares](http://jamie-wong.com/2014/08/19/metaballs-and-marching-squares/)
+- Webflow - [Make and animate Metaballs with Webflow](https://blobs.webflow.io/)
+- Opacity - [Alpha blending](https://en.wikipedia.org/wiki/Alpha_compositing#Alpha_blending)
+- ColorMatrix filter - [Finessing `feColorMatrix`](https://alistapart.com/article/finessing-fecolormatrix/)
+- Similar post - [Gooey effect - Making things stick](https://css-tricks.com/gooey-effect/#making-things-stick)

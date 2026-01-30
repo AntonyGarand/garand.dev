@@ -1,0 +1,304 @@
+---
+title: "PHP: Return true to win - WriteUp (Part 1)"
+description: "Returntrue.win is a website containing many challenges where you supply the input of a function which needs to return true. This posts covers the solutions to these challenges."
+publishDate: 2018-06-22
+tags:
+  - challenge
+  - php
+  - writeup
+draft: false
+---
+
+# Introduction
+[Returntrue.win](https://returntrue.win/) is a website containing 16 PHP challenges where we must return true using the least amount of characters in the given context.  
+
+The challenges demonstrate many interesting quirks from PHP and are of greatly varying difficulty, which is why solving and understanding those can help us gain a better understanding of the language.
+
+This post will cover the first 8 solutions, while an upcoming part 2 will cover the remaining ones.
+
+Now is the time to stop reading and try to solve the challenges yourself before reading on the solutions!
+
+Website: [https://returntrue.win](https://returntrue.win/)
+
+## Level 1
+
+#### Challenge
+```php
+function foo($x)
+{
+    return $x;
+}
+```
+#### Solution
+```php
+foo(!0);
+```
+
+#### Explanation
+The obvious solution would be to enter `true`, but that would be 4 bytes and the shortest answer uses only half of those! We can save two bytes by using `!0` instead. 
+The reason `!0` works is as the [logical not (!)](https://secure.php.net/manual/en/language.operators.logical.php) operator will [type cast](https://secure.php.net/manual/en/language.types.boolean.php#language.types.boolean.casting) the value to a boolean first, and return the opposite of this result.  
+As `0` is converted to `false`, we get `!false`, which is `true`.  
+See: [Boolean type casting](https://secure.php.net/manual/en/language.types.boolean.php#language.types.boolean.casting) for a list of values converted to false.
+
+## Level 2
+
+#### Challenge
+```php
+function foo($x)
+{
+    return $x('gehr') === 'true';
+}
+```
+
+#### Solution
+```php
+foo(str_rot13)
+```
+#### Explanation
+Our first guess could be to create an [anonymous function](https://secure.php.net/manual/en/functions.anonymous.php) which always returns `'true'`, such as the following:
+```php
+foo(function(){return'true';})
+```
+But this isn't the shortest solution.  
+The key to the shortest 9 bytes score is the 'gehr' argument given to the function, which is exactly `true` with each letter shifted by 13 characters.  
+As it turns out, php has the [str_rot13](https://secure.php.net/manual/en/function.str-rot13.php) function which performs this exact operation!
+
+PHP doesn't like crashing, and it does so by trying to be smart with its conversions.
+When we're using a constant which is not defined, the following behavior is used:
+
+> If you use an undefined constant, PHP assumes that you mean the name of the constant itself, just as if you called it as a string (CONSTANT vs "CONSTANT").
+From: [PHP Constant syntax](http://us.php.net/manual/en/language.constants.syntax.php)
+
+Combine this with [Variable Functions](https://secure.php.net/manual/en/functions.variable-functions.php)
+> This means that if a variable name has parentheses appended to it, PHP will look for a function with the same name as whatever the variable evaluates to, and will attempt to execute it. 
+
+And we've got a working solution!
+
+## Level 3
+
+#### Challenge
+
+```php
+function foo($x)
+{
+    return ($x >= 1) && ($x <= 1) && ($x !== 1);
+}
+```
+
+#### Solution
+```php
+foo(!0)
+// Or 
+foo(1.)
+```
+
+#### Explanation
+
+The first requirement here is get a variable which is `<=` and `>=` than 1.
+As those are numeric comparisons, PHP will convert both sides of the equation to numbers.  
+The second requirement is for our variable to not be the integer `1`.
+
+Booleans converted to numbers will manage to pass this condition:
+> FALSE will yield 0 (zero), and TRUE will yield 1 (one).  
+
+From the doc: [Integer: Casting from boolean](https://secure.php.net/manual/en/language.types.integer.php#language.types.integer.casting.from-boolean)  
+This gives us our first answer, passing `true` will succeed in all the checks.
+
+The second solution is based on PHP's handling of its different numeric types.  
+As you may know, PHP has both [floats](https://secure.php.net/manual/en/language.types.float.php) and [integers](https://secure.php.net/manual/en/language.types.integer.php).  
+As they are different types, `1.0` and `1` returns true to the Not identical operator.  
+Our solution is therefore the float value of `1`, which can be written `1.`
+
+References:
+[Comparison operators](https://secure.php.net/manual/en/language.operators.comparison.php)  
+[Integer: Casting from boolean](https://secure.php.net/manual/en/language.types.integer.php#language.types.integer.casting.from-boolean)
+
+## Level 4
+
+#### Challenge
+```php
+function foo($x)
+{
+    $a = 0;
+    switch ($a) {
+        case $x:
+            return true;
+        case 0:
+            return false;
+    }
+    return false;
+}
+```
+#### Solution
+```php
+foo(0);
+```
+#### Explanation
+As `$a` is `0` an we need the program flow to enter our `case $x`, the solution is to set `$x` to `0`.  
+Not much of a challenge here!
+
+## Level 5
+
+#### Challenge
+```php
+function foo($x)
+{
+    return strlen($x) === 4;
+}
+```
+#### Solution
+```php
+foo(💩);
+```
+#### Explanation
+The tricky part here is getting the shortest solution, which is only 1 character long yet `strlen` will return 4.
+The solution resides in the difference between `strlen` and `mb_strlen`, which handles multibyte strings differently:
+
+>strlen() returns the number of bytes rather than the number of characters in a string.
+
+>[mb_strlen()] A multi-byte character is counted as 1. 
+
+As utf8 supports up to 4 bytes per character, our poop emoji returns `4` on the `strlen` function while being only one character.
+
+References:
+[strlen documentation](https://secure.php.net/manual/en/function.strlen.php)  
+[mb_strlen documentation](https://secure.php.net/manual/en/function.mb-strlen.php)
+
+
+## Level 6
+
+#### Challenge
+```php
+function foo($x)
+{
+    return $x === $x();
+}
+```
+#### Solution
+```php
+// Not working anymore, 22 characters
+foo(($x=session_id)($x).$x);
+// Shortest? working solution: 33 characters
+foo($x=function()use(&$x){return $x;})
+// Alternative working solution, 42 characters
+foo($GLOBALS[x]=function(){return$GLOBALS[x];})
+// Runner up, 44 characters
+foo(new class{function __invoke(){return$this;}})
+```
+#### Explanation
+This one is among the most interesting challenges of the lot, and I've spent a lot of time finding the shortest solution.
+
+Note that at the time of this writing, the shortest solution will **NOT** work due to additional sandboxing done on the website, but it does work locally if you have sessions enabled.
+
+There are four different solutions which I'd like to explore here.
+
+##### Shortest
+```php
+($x=session_id)($x).$x
+// Which is equivalent to
+$x = 'session_id';
+$x($x);
+foo($x);
+```
+Firstly, the essence of this solution is the [session_id](https://secure.php.net/manual/en/function.session-id.php) function.  
+This function is used as an getter/setter:  
+- When called without an argument, it will return the stored value.  
+- When called with an argument, it will assign its inner value and return an empty string.
+
+The first part of this solution is setting the `$x` variable to `'session_id'` (As string, because of [PHP's handling of undefined constants](http://us.php.net/manual/en/language.constants.syntax.php)).  
+The second part is calling session_id, which works once again thanks to [PHP's Variable functions](https://secure.php.net/manual/en/functions.variable-functions.php), with `$x` as argument. As `$x` is a string, this will set the content of `session_id` to `'session_id'`.  
+The result of our `session_id($x)` call is an empty string, which isn't what we want to send to `foo`.  
+In order to send `session_id` to `foo`, we concatenate `$x` to the empty string we previously had, which results in the `'session_id'` string.
+
+Finally, the foo function will compare our entry variable  `$x`, aka. `'session_id'`, to the result of `$x()`, aka. `session_id()`.
+As we did set our `session_id` to `'session_id'`, both strings are the same and we passed the comparison!
+
+##### Self returning function using use
+```php
+$x=function()use(&$x){return $x;}
+```
+This solution is pretty straightforward: Create a function which uses itself, and returns itself.  
+
+Reference: [Anonymous functions](https://secure.php.net/manual/en/functions.anonymous.php), specifically [example #3](https://secure.php.net/manual/en/functions.anonymous.php#example-165)
+
+##### Globals
+```php
+$GLOBALS[x]=function(){return$GLOBALS[x];}
+// Which is equivalent to
+
+$GLOBALS[x] = function() {
+    return $GLOBALS[x];
+};
+foo($GLOBALS[x]);
+```
+This solution is similar to the previous one, but uses the [$GLOBALS](https://secure.php.net/manual/en/reserved.variables.globals.php) array instead of inheriting variables from the parent scope.
+
+##### Callable class returning itself
+```php
+new class {
+    function __invoke()
+    {
+        return $this;
+    }
+}
+```
+Since PHP7, we can create [Anonymous Classes](https://secure.php.net/manual/en/language.oop5.anonymous.php).  
+This lets us create a new class with the [__invoke](https://secure.php.net/manual/en/language.oop5.magic.php#object.invoke) magic method implemented.  
+This magic method lets us return `$this` when we call our object as a function to solve the challenge!  
+
+## Level 7
+
+#### Challenge
+```php
+function foo(stdClass $x)
+{
+    $x = (array) $x;
+    return $x[0];
+}
+```
+#### Solution
+```php
+foo((object)[!0]);
+```
+#### Explanation
+This solution resides in how PHP [type casts to object](https://secure.php.net/manual/en/language.types.object.php#language.types.object.casting).  
+As we are typecasting an array with `[0 => true]` to an object, we are creating a generic stdClass with the `0` property having the `true` value.  
+Once this is type casted back to an array with the `$x = (array) $x;` line, the property `0` of our object gets back to the new array's index 0.
+
+## Level 8
+
+#### Challenge
+```php
+class Bar {}
+
+function foo(Bar $x)
+{
+    return get_class($x) != 'Bar';
+}
+```
+#### Solution
+```php
+foo(new class extends Bar{});
+```
+#### Explanation
+This solution depends on [Object Inheritance](https://secure.php.net/manual/en/language.oop5.inheritance.php) in PHP.  
+We can create a new child class which extends `Bar` as an argument. As the given object is a new class, [get-class](https://secure.php.net/manual/en/function.get-class.php) will return the name of the new anonymous class and not 'Bar'.
+
+# Conclusion
+
+Those were lots of original solutions to the challenge!  
+Most of those solutions did produce warnings and notices, therefore most of the odd behavior should be detected in a proper development environment.  
+
+I would like to thank:   
+- [@matthieunapoli](https://twitter.com/matthieunapoli) for making this awesome website
+- [@MarcS0h](https://twitter.com/MarcS0h) for solving the easiest challenges while I was tackling the hard ones
+- [@rpkamp82](https://twitter.com/rpkamp82), for his [Writeup](https://www.rpkamp.com/2018/02/15/all-answers-to-returntrue.win-with-explanations/) on returntrue.win
+- [@dopitz](https://twitter.com/dopitz) for his [gist](https://gist.github.com/odan/0799dfa59d40acdb18e8a1fa9611a996) containing many short solutions
+
+If you do know similar oddities or challenge websites, please do send them my way so I can solve and write about them!
+
+# References
+https://returntrue.win
+https://gist.github.com/odan/0799dfa59d40acdb18e8a1fa9611a996
+https://www.rpkamp.com/2018/02/15/all-answers-to-returntrue.win-with-explanations/
+https://alf.nu/ReturnTrue - Similar website for JavaScript

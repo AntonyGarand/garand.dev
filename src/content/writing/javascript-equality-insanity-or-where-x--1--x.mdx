@@ -1,0 +1,237 @@
+---
+title: "JavaScript: Equality insanity, or where x === 1 && x === 2"
+description: "JavaScript can produce interesting behavior thanks to its dynamic nature and rich features!"
+publishDate: 2018-06-15
+tags:
+  - javascript
+  - challenge
+draft: false
+---
+
+JavaScript can be used to make even the best of ourselves doubt what is currently happening.
+
+In this post, I will show you different methods which can be used to make the following statement return true:
+```javascript
+x === 1 && x === 2
+```
+
+Let me start with a challenge, for those among you who wish to attempt it yourselves first.
+If you only want the answer, skip to the *writeup* section!
+
+# Challenge
+There are three difficulty levels for this challenge, and many available solutions!  
+Your objective is to give X the required value for `Flag!` to be printed.
+
+Place the following snippet somewhere in order to print `Flag!`  
+## Level 1
+```javascript
+// Your code here
+
+if(x == 1 && x == 2 && x == 3) {
+    console.log('Flag!');
+} else {
+    console.log('Wrong flag!');
+}
+
+// Your code here
+```
+
+## Level 2
+Let's make things a bit harder by using the strict equal operator!
+
+```javascript
+// Your code here
+
+if(x === 1 && x === 2 && x === 3) {
+    console.log('Flag!');
+} else {
+    console.log('Wrong flag!');
+}
+
+// Your code here
+```
+
+## Level 3
+Finally, let's print the flag within the current scope!  
+This means this statement should not be within a class or function, but by itself within the script.
+```javascript
+// Your code here
+
+if(x === 1 && x === 2 && x === 3) {
+    console.log('Flag!');
+} else {
+    console.log('Wrong flag!');
+}
+```
+
+
+# Writeup
+Did you manage to print `Flag!`?  
+
+## Part 1
+
+Here is the first part of the previous challenge:
+```javascript
+if(x == 1 && x == 2 && x == 3) {
+```
+The key to solving this part of the challenge is to know how JavaScript compares two objects.  
+
+Using the *Equality Operator* `==` instead of the *Strict Equality Operator* `===` means that the engine will try to convert both of the objects to primitives before comparing them.  
+You can find out more about the comparisons on MDN's [Comparison Operators](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Comparison_Operators) page.
+
+This means that if we're comparing an object with a string, `myObject.toString()`'s result will be used for the comparison instead of failing.  
+Example:
+
+```javascript
+const myObject = {
+    toString() {
+        return 'My Object!';
+    }
+}
+console.log(myObject == 'My Object!');
+```
+
+returns `true`
+
+In our scenario, as we're comparing x to the primitive type `Number`, the following steps will take place in the background:  
+> If Type(x) is Object and Type(y) is either String or Number,  
+> return the result of the comparison ToPrimitive(x) == y.  
+
+This behavior is documented in EcmaScript: [The Abstract Equality Comparison Algorithm](https://www.ecma-international.org/ecma-262/5.1/#sec-11.9.3)  
+
+Converting an object to a primitive is achieved by calling the object's `toString` or `valueOf` methods, as documented here: [Object [[DefaultValue]]](https://www.ecma-international.org/ecma-262/5.1/#sec-8.12.8)  
+In ES6, we can also directly override [Symbol.toPrimitive](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Symbol/toPrimitive) to return our own custom value.
+We can therefore create an object with the `toString` or `valueOf` function returning an incrementing number!  
+
+### Solution
+
+```javascript
+let i = 1,
+  x = {
+    valueOf() { // Default conversion for numbers
+      return i++;
+    },
+    toString() { // Default conversion for strings
+      return i++;
+    },
+    [Symbol.toPrimitive]() { // toPrimitive override
+        return i++;
+    }
+  }
+
+if(x == 1 && x == 2 && x == 3) {
+    console.log('Flag!');
+} else {
+    console.log('Wrong flag!');
+}
+```
+
+Note that Symbol.toPrimitive is the first attempted call, then `valueOf`and finally `toString`, should the order be important in your future challenges.
+
+## Part 2
+
+The first part of this challenge could be solved using an Object and a non-strict comparison, but this will not work here.  
+As we are using the strict equal operator, `x` needs to be `1`, then `2` and finally `3`.
+
+Two tricks are needed to solve this problem: 
+[Getters](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Functions/get) and an obscure `with` statement.
+
+The first part of this solution requires creating an object, `myObject`, which has the `x` property set to a getter function:
+
+```javascript
+
+let i = 1,
+  myObject = {
+    get x() {
+        return i++;
+    }
+ }
+```
+
+We can now access `myObject.x` and it will return an incrementing value!  
+
+This is still not enough to solve the challenge, as the if statement does not have our `myObject` prefix in the comparison.  
+Thankfully or not, there is an obscure statement in JavaScript which lets us set our scope to the properties of an object: `with`  
+Don't you like it when the MDN page for the operator starts with this big warning?
+
+![MDN Warning](/images/blog/l3xlxgygbortedtxvoow-1.png)
+
+The MDN [documentation](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/with) describes with as the following:
+> The 'with' statement adds the given object to the head of this scope chain during the evaluation of its statement body. If an unqualified name used in the body matches a property in the scope chain, then the name is bound to the property and the object containing the property.
+
+The second part of this solution is therefore wrapping the comparison in a `with` statement, which will let `x` be accessed like a native property.
+
+### Solution
+
+```javascript
+let i = 1,
+  myObject = {
+    get x() {
+        return i++;
+    }
+ }
+
+with(myObject) {
+
+  if(x === 1 && x === 2 && x === 3) {
+    console.log('Flag!');
+  } else {
+    console.log('Wrong flag!');
+  }
+
+}
+```
+
+## Part 3
+
+The previous solution only works out if you can control the context of the if statement, which is rarely the case when you're looking for XSS's.  
+As such, we can adapt our solution to require a single entry point, before the if statement, to print out `Flag!`.  
+Note: If you only have an entry point below the comparison, you might want to check out my previous post: [Watch out for unwanted hoisting](https://dev.to/antogarand/javascript-watch-out-for-unwanted-hoisting-49ii)!
+
+As we are still using a strict equality check, we still need to use a getter to generate X.  
+The difference with this solution is to add the accessor directly on current scope, the `this` object.  
+In a browser, `this` would refer to the `window` object, as defined by the DOM model.  
+In NodeJS, `this` would refer to the `global` object.   
+
+To modify the property of the current object property, we will use [Object.defineProperty](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/defineProperty)
+
+### Solution
+```javascript
+let a = 1;
+Object.defineProperty(
+  window, // Object to assign the new property to: this, window, or global depending on the context 
+  'x', // Name of the property to assign
+  {  // Properties of the object, the getter function in our case
+    get: function() { 
+      return a++; 
+    } 
+  }
+);
+
+if(x === 1 && x === 2 && x === 3) {
+  console.log('Flag!');
+} else {
+  console.log('Wrong flag!');
+}
+```
+
+# Conclusion
+Thanks to its dynamic nature, JavaScript can make a sane developer understand why `x === 1 && x === 2 && x !== x` works!  
+Hopefully no one will depend on such features in actual code, but I would love to see a real world use case of such characteristics.
+
+On another note, this had me thinking about comparisons which may only be false in JavaScript.  
+As you may know, `NaN` always returns false in a comparison, including with itself.  
+The only other value this may be true I know of would be `Symbol()`, as each symbol is unique.  
+Now, we can create a dynamic value for `x` where `x !== x` is indeed true.  
+
+Know other interesting features of JS you think would be worthy of a post?  
+Leave out a comment or reach out to me on [Twitter](https://twitter.com/antogarand)!
+
+# References
+MDN: [Comparison Operators](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Comparison_Operators)  
+EcmaScript: [The Abstract Equality Comparison Algorithm](https://www.ecma-international.org/ecma-262/5.1/#sec-11.9.3)  
+EcmaScript: [Object [[DefaultValue]]](https://www.ecma-international.org/ecma-262/5.1/#sec-8.12.8)
+
+MDN: [Getters](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Functions/get)  
+MDN: [With](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/with)  
+MDN: [Object.defineProperty](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/defineProperty)

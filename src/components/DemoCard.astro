@@ -1,0 +1,77 @@
+---
+/**
+ * DemoCard Component
+ *
+ * Displays a demo or experiment entry in a card format with title, description,
+ * and optional technologies. Extends BaseCard component with demo-specific
+ * features including optional category badges and technology tags.
+ *
+ * @component
+ *
+ * @example
+ * ```astro
+ * <DemoCard
+ *   title="Interactive Metaballs"
+ *   slug="metaballs"
+ *   description="Interactive SVG metaball effect with blur and alpha controls"
+ *   category="Interactive"
+ *   tech={['SVG', 'JavaScript']}
+ * />
+ * ```
+ */
+
+import BaseCard from './BaseCard.astro';
+import ForwardLink from './ForwardLink.astro';
+
+interface Props {
+  /** Demo title (displayed as card heading) */
+  title: string;
+
+  /** URL path for the demo (e.g., "/metaballs", "/pattern-brush") */
+  slug: string;
+
+  /** Brief description of what the demo does */
+  description: string;
+
+  /** Optional category badge (e.g., "Interactive", "Experiment", "Game") */
+  category?: string;
+
+  /** Optional array of technologies or tools used */
+  tech?: string[];
+}
+
+const { title, slug, description, category, tech = [] } = Astro.props;
+---
+
+<BaseCard href={slug} class="demo-card">
+  {category && (
+    <div slot="badge" class="demo-category">
+      {category}
+    </div>
+  )}
+
+  <span slot="title">{title}</span>
+  <span slot="description">{description}</span>
+
+  {tech.length > 0 && (
+    <div slot="tags" class="tags-list">
+      {tech.map((t) => (
+        <span class="tag">{t}</span>
+      ))}
+    </div>
+  )}
+
+  <ForwardLink text="Try it" />
+</BaseCard>
+
+<style>
+  .demo-category {
+    display: inline-block;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--color-accent);
+    margin-bottom: 0.5rem;
+  }
+</style>

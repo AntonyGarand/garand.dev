@@ -1,0 +1,96 @@
+---
+title: "Making math animations and videos with code"
+description: "Cover gif by Freya Holmér     I feel like animations are the most intuitive way to visualize and und..."
+publishDate: 2020-04-30
+tags:
+  - tools
+  - video
+  - math
+draft: false
+---
+
+> Cover gif by [Freya Holmér](https://twitter.com/FreyaHolmer/status/1202648662049996801)
+
+I feel like animations are the most intuitive way to visualize and understand certain concepts, making them a great way to share and deepen knowledge on a subject.
+Yet, the classic video editors were never intuitive or easy enough to get started, coming from a technical perspective.
+
+As I've been seeing more of these animations recently, I've decided to list the available tools in hopes of trying them out!
+
+# Objectives
+
+Here are few awesome animations sources I've seen, and would like to be able to perform using mostly code.
+
+## 3Blue1Brown on Youtube
+
+[3Blue1Brown](https://www.youtube.com/channel/UCYO_jab_esuFRV4b17AJtAw) is probably the most known math channel on Youtube.  
+His videos are mesmerizing, and the quality of his animations is astounding.
+
+Here are two of the most interesting visualization I've seen from him:
+
+[Using color to solve 2 dimensional equations](https://www.youtube.com/watch?v=b7FxPsqfkOY)
+
+## Freya Holmér on Twitter
+
+I initially found her from her [Bezier curve medium post](https://medium.com/@Acegikmo/the-ever-so-lovely-b%C3%A9zier-curve-eb27514da3bf), which has a very visual approach when teaching us these curves.
+![Sample animation of a bezier curve from the medium post](/images/blog/wnf-6ayQN5bV5_t4PtbhiA.gif)
+
+Since then, I've been following her [twitter](https://twitter.com/FreyaHolmer/) and she continuously posts interesting visualization of her projects and problems.
+
+Here is a collection with most of her animations for you to explore:
+https://twitter.com/FreyaHolmer/timelines/1215413954505297922
+
+# Tools
+
+Now, let's talk about the available tools to make our own!  
+This is in no way an exhaustive list, these are only the ones I've seen and added to my pinboard over time.
+
+## Manim (Python)
+
+[Source on Github](https://github.com/3b1b/manim/)
+Manim is the tool built by 3Blue1Brown, and probably the most popular one in this list.  
+It was built for the very specific purpose of making these awesome animations, and is used by thousands of content creators.
+
+## Reanimate (Haskell)
+
+[Source on Github](https://github.com/Lemmih/reanimate#examples)  
+Reanimate wants to be a library similar to Manim, but with a twist: It's made in Haskell! It is a lot less popular than Manim for obvious reasons, but does look very promising.
+
+This tool would be a great way to play with Haskell and to perform simple, pure animations easily.
+
+## MoviePy (Python)
+
+[Source on Github](https://github.com/Zulko/moviepy)  
+MoviePy is mostly a video editing tool, but when combined with the power of the [Cairo](https://pycairo.readthedocs.io/en/latest/) vector library, it can make very interesting animations, such as this funky pentagon made with [only 30 lines of code](https://zulko.github.io/blog/2014/09/20/vector-animations-with-python/#example-10)!
+[![Animation made with MoviePy ](/images/blog/2YdW9yf.gif)](https://zulko.github.io/blog/2014/09/20/vector-animations-with-python/#example-10)
+
+## Html5 Canvas (JavaScript)
+
+Since there are already lots of tools to animate canvas, such as [D3.js](https://d3js.org/), [PaperJS](http://paperjs.org/) or [FabricJS](fabricjs.com/), you could use these tools to perform your animation and then [record the canvas](https://medium.com/@amatewasu/how-to-record-a-canvas-element-d4d0826d3591) or use a tool such as [Editly](https://github.com/mifi/editly) to save it from the CLI.
+
+This also means it's easier to make and share an interactive version, and possibly easier to debug it as it relies on a real time feedback loop.
+
+The major issue I see using a Canvas is the lack of easy 3d support when compared to other tools, as well as a smaller base to start with.
+
+## Blender
+
+[Website](https://www.blender.org/)
+Blender is probably best known for its 3d modeling capabilities, but it can also do animations, video editing, 2d and 3d models. With its powerful scripting capabilities, there isn't much it isn't able to do!
+Using tools like [Primer](https://github.com/Helpsypoo/primer) makes it easier to make statistics and environment related videos, like the ones on the [primer](https://www.youtube.com/watch?v=0ZGbIKd0XrM) youtube channel.
+
+## [Soon] Shapes (C# - Unity)
+
+I've discussed Freya earlier in the objective sections, with her animation style and quality as an inspiration for this post.  
+She is working on Shapes, and while it isn't released yet, nor will it be free at first, it already had its quality demonstrated with the animations built with it.
+It integrates with the [Unity](https://unity.com/) engine, which is a very different approach than the other tools, and absolutely merits a mention.
+
+It should be released within two weeks according to [a post on twitter](https://twitter.com/FreyaHolmer/status/1255210518807302146), but will be limited to her patreons.
+
+---
+
+# Conclusion
+
+Math animations are awesome, and the tooling for everyone to make their own is available!
+
+Do you have any other sources of these I should be aware of, or perhaps other tools I've missed? Please leave them in a comment so I can check them out!
+
+To end this, I couldn't do this post without linking to the [math section](https://explorabl.es/math/) on the [explorabl.es](https://explorabl.es/) website, which lists dozens of very interactive tools for various math concepts.

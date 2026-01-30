@@ -1,0 +1,110 @@
+---
+title: "Vulnerabilities in Guilded.gg"
+description: "I recently stumbled upon a Youtube video by No Text To Speech regarding Guilded issues that reminded..."
+publishDate: 2023-12-20
+tags:
+  - security
+draft: false
+---
+
+I recently stumbled upon [a Youtube video](https://www.youtube.com/watch?v=i2ZezwcUzMI) by No Text To Speech regarding Guilded issues that reminded me of an interesting vulnerability I reported to their service few years ago, and made me realize I never wrote about it!
+
+[Guilded](https://www.guilded.gg/) is a chat service similar to Discord with larger community-oriented features, such as a proper Forum, event calendar, tournaments and various similar goodies. With this increase in features comes an increase in scope for potential bugs and vulnerabilities!
+
+3 years ago, I started looking into finding such vulnerabilities, so here are the result of this investigation!
+
+## Stored XSS via javascript links
+An easy one I immediately found was that links were only validated on the client-side, allowing us to craft a link containing a javascript payload:
+
+```
+[Link](javascript:alert(document.cookie))
+```
+When clicked on by users, we could execute arbitrary JavaScript on their behalf!
+I crafted few fun payloads abusing the API authentication being cookie-based, meaning any calls I did to the API was already authenticated as the current user, and it allowing to change a password without re-entering the existing password first!
+![Posts within the Guilded forum with a Javascript payload](/images/blog/jjl33bsys3xtbo69nm10.png)
+
+Interestingly, the payloads are still there to this day even though they no longer work due to some client-side validation before redirecting to the browser to the links.
+
+## Crashing sections with invalid JSON
+
+There are multiple places in which you can leverage some more advanced markdown features, such as using bold and links within the text:
+- Forum thread, comment
+- Tournament
+- Announcements
+- Profile comments
+Essentially everywhere but the basic chat messages.
+
+Through the API, these messages are sent as a JSON representation of the Markdown format, but a lack of server-side validation of the whole depth of these messages allows us to send a broken representation of the items.
+For example, replacing a nested object with a literal string: `"content":"text"` instead of `"content":{…}`
+
+This allows us to send invalid payloads to the server which are stored and sent to the user clients, which do not handle these invalid nodes cleanly:
+
+![Forum message displaying an error loading content](/images/blog/jscw652zz3rrymy3k7bb.png)
+
+While in itself this might seem like a self sabotage, in some sections any broken component will break the whole section and prevent anyone else from being able to view or edit the content, such as within the Tournaments:
+![Tournament section displaying an error loading content](/images/blog/vjbujtzy5qwrcme29g64.png)
+This means any user with the permissions to insert content within these sections could brick them for everyone!
+
+Interestingly, this still hasn't been fixed per the NTTS video I referenced earlier: Despite knowing about this for over 3 years, it hasn't been recognized as a bug worth fixing since then.
+
+![Email from Oct. 2020 to security@guilded.gg mentioning "some of the other stuff may either be in progress or not an immediate priority for repair"](/images/blog/6idjs4hzjzopi7bvu5kx.png)
+
+## Weak account settings security
+
+While not a vulnerability per se, I included this within my original report as it is a security practice that many younger companies neglect implementing as it is fairly trivial to overlook.
+All of the user settings, including the email and password, could be updated without any additional authentication: For example, to update the password, you did not need to enter the current password.
+Additionally, when a major setting was changed, such as the email or password, no notifications were sent to the original email!
+This means that once logged in on an account, an attacker could change the credentials, both email and password, without the original account owner being made aware!
+
+## Magic links lacking restrictions
+
+Guilded used to send you magic links when you tried logging into the application and when using the "Forgot your password" feature: This link would authenticate you without having to enter your password, making it a convenient way to login.
+
+While having a compromised account is bad enough, some decisions made within this feature made it impossible to secure any account once it had been compromised: 
+The magic links are not limited to one use, and only expire after 48h.
+They also work even if the email or password has been changed since the original link was made, or if a new link was generated.
+
+Overall, what this means is that once an account has been compromised, there are no ways of securing the account back as the attacker can always use an existing magic link to regain access to it.
+Additionally, an interesting attack vector I thought of by combining the lack of notifications on email update and this vulnerability would be the following, allowing a persisted account access without the owners knowledge.
+
+1. The attacker compromises the account
+2. The attacker changes the email to his.  
+    Note that with the weak account settings security, the original author is not notified of this change, as no emails are sent!
+3. The attacker sends himself a magic link
+4. The attacker restores the account email to the original one
+5. Repeat step 2-4 every 2 days, before the expiration of the original magic link.
+
+Now, if the attacker is logged out of the account at any time, he can use the magic link he has in reserve to log back into the account and keep his access.
+
+## Dangerous email forwarding: API key within unsubscribe button
+
+This is the favorite vulnerability I've discovered within this service, as it allowed a user to compromise his own account by forwarding the Guilded news to his friends.
+
+The `token` generated for notification settings and the unsubscribe button, included in all correspondence from Guilded contained a fully-fledged API token which can be used to take over an account.
+
+There are two ways to authenticate yourself on the API: Using your Cookies, or using an authentication token within the request body.
+When using the website or app, the cookie is used as a passive authentication, but emails do not have access to such cookies, and instead are passing through a specific token which should allow the website to update the email notification settings and unsubscribe the user.
+
+As you might expect from this title, the token provided within the unsubscribe button was not restricted in scope to only update the email settings: Instead, by decoding the literal token or copying it from the API request to update the notification preferences, you can use it to perform any other API action.
+
+Under each email sent by Guilded, the notification settings link has the following format:
+```
+https://www.guilded.gg/emailsettings?info=ey[base64value]=
+```
+Once base64 decoded, we get a payload following this format:
+```
+{
+  email: "account@email.com"
+  token: "MWZjY2Qw ... YWU="
+  userId: 215754
+}
+```
+The token here is used to authenticate us when calling the `/users/[id]/profilev2` endpoint and update the `settingsInfo` values for the email preferences.
+This endpoint is also used to update the profile values, such as the username and email.
+This means we can use this token to change the user email, and compromise the account.
+![Request using the token extracted from the email](/images/blog/inbfwdz45n0x9x583u15.png)
+In this example, I've updated my username using this token.
+
+## Conclusion
+
+Overall, I had fun testing the security of Guilded: It had its share of interesting quirks and vulnerabilities and was a fun target. It was my first time seeing the unsubscribe button allowing a complete account takeover, one more tool to add to my arsenal when hacking startups!

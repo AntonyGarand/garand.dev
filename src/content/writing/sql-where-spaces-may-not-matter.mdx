@@ -1,0 +1,139 @@
+---
+title: "SQL: Where spaces may not matter"
+description: "Here is a vulnerable application which can be exploited thanks to a rather unknown SQL quirk."
+publishDate: 2018-07-28
+tags:
+  - security
+  - sql
+  - challenge
+draft: false
+---
+
+# Introduction
+
+Here is the source to a voluntarily vulnerable application:  
+https://gitlab.com/AntonyGarand/pwn_fix_repeat_size_does_matter
+
+It will soon be added as a challenge on the [pwnfixrepe.at](https://pwnfixrepe.at/challenges.html) website, where you can work on fixing such security issues.
+
+Your mission, if you accept it, is to login as administrator on the application.
+
+If you wish to skip to the details, head to the `solution` section.
+
+---
+
+# Application
+
+The application itself is quite simple.  
+There are three features: Log in, log out and register.
+
+Here is what the table look likes: ([Source](https://gitlab.com/AntonyGarand/pwn_fix_repeat_size_does_matter/blob/master/setup.sql))
+```sql
+CREATE TABLE `users` (
+  `id` int(11) PRIMARY KEY,
+  `username` varchar(20) NOT NULL,
+  `password` varchar(255) NOT NULL,
+  `description` varchar(255) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+INSERT INTO `users` (`id`, `username`, `password`, `description`) VALUES (1, 'admin', '$up3rS3cr3tP4$$w0rd!', 'You are admin!');
+```
+
+All of those features are using prepared statements and are not vulnerable to SQL injection, such as with the following login function: ([Source](https://gitlab.com/AntonyGarand/pwn_fix_repeat_size_does_matter/blob/master/functions.php))
+
+```php
+function login() {
+    global $db;
+    if ( /* user or pass empty or not string */ ) {
+        return false;
+    }
+    $query = $db->prepare('SELECT * FROM users WHERE username = :username and password = :password');
+    $query->bindParam(':username', $_POST['user']);
+    $query->bindParam(':password', $_POST['pass']);
+    $query->execute();
+    $result = $query->fetch();
+    if ($result) {
+        $_SESSION['username'] = $result['username'];
+        echo 'Logged in succesfully!';
+    } else {
+        echo 'Invalid credentials!';
+    }
+}
+
+```
+
+Finally, if the current user is logged in, we show a greeting message:
+
+```php
+/* if current user is logged in */ 
+{ ?>
+    <div>
+        Welcome back, <?= htmlspecialchars($currentUser['username']) ?>!<br/>
+        <?= $currentUser['description'] ?>
+    </div>
+    <!-- ... -->
+    <?php
+}
+```
+
+# Analysis
+
+The vulnerability is not within PHP, but rather is caused by SQL itself, and many bad design decisions with the vulnerable application.
+
+Here are few observations on the users table:  
+ * The username is not unique
+ * The username is a varchar of length 20
+
+And on the application itself:  
+ * The logged in user is based off the username
+```php
+// If login success: 
+$_SESSION['username'] = $result['username'];
+```
+ * You can only register a user if the username isn't already taken
+```php
+if (selectUser($_POST['user'])) {
+    echo 'Username already taken!';
+    return false;
+}
+```
+
+# Solution
+
+Comparing strings in SQL is interesting.  
+What would you expect the following statement to be? 
+```sql
+SELECT * FROM (select 1) as t WHERE 'x' = 'x '
+```
+
+Unlike what many would expect, the `'x' = 'x '` condition is `true`!  
+In SQL, when comparing two strings, the shortest one is padded with spaces until they are of equal length.
+This does effectively mean that trailing spaces are useless in regular string comparisons!
+
+This is defined in the comparison operator in the [SQL spec](http://www.contrib.andrew.cmu.edu/~shadow/sql/sql1992.txt):  
+> a) If the length in characters of X is not equal to the length in characters of Y, then the shorter string is effectively replaced, for the purposes of comparison, with a copy of itself that has been extended to the length of the longer string by concatenation on the right of one or more pad characters, where the pad character is chosen based on CS. If CS has the NO PAD attribute, then the pad character is an implementation-dependent character different from any character in the character set of X and Y that collates less than any string under CS. Otherwise, the pad character is a `<space>`.
+
+The key to successfully exploit the application is resides in this particularity.
+
+The first thing we need to do is create a new user, with the same name as "admin".  
+We can do this by entering a username which starts with `admin`, padded with spaces until the column size of `20`, and a non-space character.  
+This will pass the `username exists` condition, as the given username will not exist.  
+When inserting the new user, as the column has a `20` character limit, the value will be truncated to `20` characters and therefore be `admin   `, with trailing spaces.
+Note that this would not be possible if the column was unique, as we would get a duplicate entry message.
+
+The second step is to login, with the `admin` username and our created user's password.  
+As the sql table now has two users, the regular admin and our fake one, the login query will work and select our new user.  
+
+Finally, as the application finds the currently logged in user based on its username, it select the first user with the `admin` username. This means it will select the admin user instead of our own, and we can now steal the admin secret!
+
+# Conclusion
+
+Security issues are only bugs in your application.  
+Like regular bugs, you can limit their quantity by maintaining high quality code.
+In this application, marking the `username` column unique, using the id to identify the current user or performing length validation beforehand would have prevented the issue.
+
+# References
+
+* https://gitlab.com/AntonyGarand/pwn_fix_repeat_size_does_matter
+* https://stackoverflow.com/questions/4166159/sql-where-clause-matching-values-with-trailing-spaces
+* http://www.contrib.andrew.cmu.edu/~shadow/sql/sql1992.txt

@@ -1,0 +1,55 @@
+---
+title: "Deploying a NestJS Application on AWS Beanstalk"
+description: "Guide on how to deploy a NestJS application on AWS Beanstalk, or other production environment."
+publishDate: 2018-06-09
+updatedDate: 2018-08-31
+tags:
+  - nestjs
+  - beanstalk
+  - deployment
+draft: false
+---
+
+#Introduction
+
+[NestJS](https://nestjs.com/) is a progressive web framework used to build a back-end application using TypeScript.
+I've been using it to build my project, [BrawlDB](https://gitlab.com/BrawlDB/backend), and found it harder than expected to deploy on Beanstalk.
+This led me to writing this guide, hopefully it will facilitate your journey through the deployment!
+
+# Local workflow
+Running the application locally is quite easy: `npm start`
+This runs `ts-node` on the `src/main.ts` file, which launches the server on the default nest/express port, 3000.
+`ts-node` lets us execute TypeScript files without manually compiling them with `tsc` first, which accelerates the development cycle.
+
+# Application port
+The first thing we need to change in our code is the port on which our application listens.
+Beanstalk, and many other production enviroment, expects us to use the PORT enviroment variable. This is not the case on the default template yet, therefore we need to update the `src/main.ts` file to listen on the correct port.
+This is as simple as using `process.env.PORT || 3000` instead of the previously hardcoded 3000.
+This will use the PORT variable if it exists, and fallback to 3000 if it has not been set.
+![Application listening on the port variable](/images/blog/rx7dbe0bmuj3cegijn4q-1.png)
+
+# Typescript
+On AWS Beanstalk's NodeJS environment, the dev dependencies are not installed. This is normal as the `--only=production` flag is given to the `npm install` command, in order to prevent unnecessary code from being installed.
+This means that `ts-node` will not be installed, and therefore `npm start` will fail.
+
+Fortunately, compiling typescript is easy! [NestJS's starter](https://github.com/nestjs/typescript-starter) application provides us with a default working `tsconfig.json`, therefore all we need to do is run `tsc` on a terminal with TypeScript installed!
+Running `tsc` will build all of our typescript files into the dist folder. The application entrypoint will therefore be `dist/src/main.js`.
+
+# Missing files
+While the dist folder will contain the compiled Javascript files, it is not enough to run and deploy the application.
+In order to know the dependencies to install, NodeJS requires the `package.json` file.
+In my project, I store the configuration files in the `config/config.json` file, which also were not copied into the dist folder as they are not `ts`. 
+In order to deploy the application, we therefore need to copy all non-typescript configuration files, including `package.json`, to the dist folder.
+![Dist folder result](/images/blog/kessetqukiwyky8mnt6j-1.png)
+
+# Beanstalk configuration
+Finally, once we're ready to deploy everything on Beanstalk, there is one setting we need to change.
+As the default `npm start` will not work with our folders, considering there is no `main.ts` nor `ts-node` installed, we need to tell Beanstalk to run `node src/main.js`.
+This setting is `Node command`, which can be found under `Container Options` in the beanstalk configuration screen.
+![Beanstalk application settings](/images/blog/fthm4fi5dih34o8qe4da-1.png)
+
+Once the environment has launched, the application should be up and running on the given beanstalk URL!
+
+# Conclusion
+Once you've understood the previous steps to deploy your NestJS application, updating and redeploying it is easy.
+Hopefully this guide did help you with this process, and you'll keep on making awesome applications!

@@ -1,0 +1,304 @@
+---
+title: "XSS in Ghost"
+description: "Story of a reflected XSS in Ghost, the publishing platform. This post covers the technical walkthrough of the vulnerability."
+publishDate: 2018-12-16
+updatedDate: 2018-12-29
+tags:
+  - security
+  - xss
+  - vulnerability
+draft: false
+---
+
+[Ghost](https://ghost.org/) is a publishing-focused platform. It powers many writing-focused websites such as the [cloudflare blog](https://blog.cloudflare.com/), [troyhunt.com](https://troyhunt.com) and [the Mozilla VR blog](https://blog.mozvr.com). 
+
+As the code is fully open source on [github](https://github.com/TryGhost/Ghost),  I performed a security audit of the application and found an unauthenticated reflected XSS in the Subscribe feature.
+
+The patched versions are `2.4.0`, `1.25.6` and `0.11.14`. If you are running a version previous to the above patched versions and have the Subscriber feature enabled, I strongly recommend you to update as soon as possible!
+
+This post will be a technical walk through of the vulnerable code which caused this XSS.
+
+# Unauthenticated XSS in Subscriber page
+
+The subscribe page of Ghost is a feature which needs to be manually applied via the labs tab in the blog settings.  
+More information about the feature is available [here](https://docs.ghost.org/api/handlebars-themes/subscribers/).
+
+The subscribe page was vulnerable to a reflected XSS as two of the POSTed variables can be reflected:  
+  * subscribed_url
+  * subscribed_referrer
+
+Here is a POC form which used to alert the domain, on demo.ghost.io:  
+```html
+<form method="post" action="https://demo.ghost.io/subscribe/" >
+   <input type="text" name="confirm" value="x" />
+   <input type="text" name="subscribed_url" value="x><img src=x onerror='alert(document.domain)' />" />
+   <input type="email" name="email" autofocus="autofocus" value="random@email.invalid"/>
+   <button type="submit">POC</button>
+</form>
+```
+
+## Vulnerability information
+The vulnerable code is under [/core/server/apps/subscribers/lib/helpers/subscribe_form.js:46](https://github.com/TryGhost/Ghost/blob/2.3.0/core/server/apps/subscribers/lib/helpers/subscribe_form.js#L46)   
+```javascript
+hidden: new SafeString(
+	makeHidden('confirm') +
+	makeHidden('location', root.subscribed_url ? 'value=' + root.subscribed_url : '') +
+	makeHidden('referrer', root.subscribed_referrer ? 'value=' + root.subscribed_referrer : '')
+)
+```
+And rendered under the `subscribe_form` template, available at [/core/server/helpers/tpl/subscribe_form.hbs](https://github.com/TryGhost/Ghost/blob/2.3.0/core/server/helpers/tpl/subscribe_form.hbs)
+
+The SafeString function is from [HandleBars](https://handlebarsjs.com/), and enable the user to write raw (unsafe) HTML to the document.
+> [HTML escaping - Handlebars](https://handlebarsjs.com/#html-escaping)
+> Handlebars will not escape a Handlebars.SafeString. [...] In such a circumstance, you will want to manually escape parameters.
+
+In our case, we are passing the result of the [makeHidden](https://github.com/TryGhost/Ghost/blob/2.3.0/core/server/apps/subscribers/lib/helpers/subscribe_form.js#L15) function:  
+```javascript
+function makeHidden(name, extras) {
+	return templates.input({
+		type: 'hidden',
+		name: name,
+		className: name,
+		extras: extras
+	});
+}
+```
+
+Where [template.input](https://github.com/TryGhost/Ghost/blob/2.3.0/core/server/helpers/template.js#L30) is a Lodash template, and no parameters are sanitized.  
+```javascript
+templates.input = _.template('<input class="<%= className %>" type="<%= type %>" name="<%= name %>" <%= extras %> />');
+```
+
+For this vulnerability, the extras parameters is tainted with `'value=' + root.subscribed_url`, which lets us close the input tag and inject our own HTML code.
+
+## Technical information
+
+The reason why Ghost is treating `subsribed_url` and `subscribed_referrer` as safe variables is the interesting part of this attack.
+
+To perform the required trick, we need to understand how Ghost and its web server, Express, handles a request.  
+Before rendering a page, ghost will give a route a list of method to execute, each one sending its result to the next one.  
+Here is the pertinent code, from [/core/server/apps/subscribers/lib/router.js:98](https://github.com/TryGhost/Ghost/blob/2.3.0/core/server/apps/subscribers/lib/router.js#L98):  
+```javascript
+// subscribe frontend route
+subscribeRouter
+	.route('/')
+	.get(
+		_renderer
+	)
+	.post(
+		bodyParser.urlencoded({extended: true}),
+		honeyPot,
+		handleSource,
+		storeSubscriber,
+		_renderer
+	);
+
+// configure an error handler just for subscribe problems
+subscribeRouter.use(errorHandler);
+```
+The arguments given to each methods are the result, or callback arguments, of the previous method.  
+If the argument is of type `Error`, instead of continuing with the next method, it will use the `errorHandler` method, which will then display an error page.
+
+Here is the [errorHandler](https://github.com/TryGhost/Ghost/blob/2.3.0/core/server/apps/subscribers/lib/router.js#L33) function:
+```javascript
+function errorHandler(error, req, res, next) {
+    req.body.email = '';
+
+    if (error.statusCode !== 404) {
+        res.locals.error = error;
+        return _renderer(req, res);
+    }
+
+    next(error);
+}
+```
+
+As you can see, the `get`, `post` and `error` routes end up with the same `_renderer` method, which does render the same template.
+
+
+
+The subscriber form, which is the template used by all states, has two states:  
+  * An empty state, with the "Enter your email" form.  
+    It can contain errors, such as "Invalid Email", and other analytics content, such as the referrer.
+  * The filled state once you post an email, with a "Successfully subscribed" message.  
+  
+It is available under [/core/server/apps/subscribers/lib/views/subscribe.hbs:47-68](https://github.com/TryGhost/Ghost/blob/2.3.0/core/server/apps/subscribers/lib/views/subscribe.hbs#L47):  
+```hbs
+{{^if success}}
+	<header>
+		<h1>Subscribe to {{@blog.title}}</h1>
+	</header>
+
+	{{subscribe_form
+		// arguments
+	}}
+{{else}}
+	<header>
+		<h1>Subscribed!</h1>
+	</header>
+	<!-- ... -->
+{{/if}}
+```
+
+Here is the workflow visualized:
+![Ghost routes workflow](/images/blog/iep0l10ql9fh9f2m77bp.png)
+
+As our tainted parameters are rendered as hidden inputs in the form, we need to trick the server into rendering the input form while using our POST values.  
+The condition for rendering the vulnerable parameters is the `success` variable, which checks if any errors occurred when saving the new subscriber.
+
+When sending a post, the first method called is `bodyParsed.urlencoded`, which converts our body to a JavaScript object.  
+
+The second method is [honeyPot](https://github.com/TryGhost/Ghost/blob/2.3.0/core/server/apps/subscribers/lib/router.js#L45), and is essential to this attack. 
+
+```javascript
+function honeyPot(req, res, next) {
+    if (!req.body.hasOwnProperty('confirm') || req.body.confirm !== '') {
+        return next(new Error('Oops, something went wrong!'));
+    }
+
+    // we don't need this anymore
+    delete req.body.confirm;
+    next();
+}
+```
+ 
+As the form has a hidden `confirm` parameters, it will ensure the parameter is present and that its value is empty. I presume this is to prevent automated bots to fill the form with junk too frequently.  
+If those conditions are not met, it will call `next` with an error message, `Oops, something went wrong!`.  
+As this is an error object, express will stop calling the next methods and instead use an errorHandler.  
+
+If we didn't trigger this error and used the normal workflow, the [handleSource](https://github.com/TryGhost/Ghost/blob/2.3.0/core/server/apps/subscribers/lib/router.js#L58) function would be called, and perform the following logic:
+```javascript
+function handleSource(req, res, next) {
+    req.body.subscribed_url = santizeUrl(req.body.location);
+    req.body.subscribed_referrer = santizeUrl(req.body.referrer);
+
+    delete req.body.location;
+    delete req.body.referrer;
+
+    // ...
+
+    next();
+}
+```
+As you can see, it would overwrite the `subscribed_url` and `subscribed_referrer` with a sanitized version of the posted values.  
+As we did not call this method, and instead took the honeypot bait, our values for `subscribed_url` are not sanitized.
+
+We can therefore render the correct part of the form when giving a value to the 'confirm' input, as an error will be sent, which sets `success` variable to `false`.
+
+As the same `_renderer` method is used for all three scenarios, which are `get`, `post` and `errors`, it does provide the request body to the template, even if we're in an error scenario.  
+Once we get in the rendering code of our form, `subscribe_form.js`, our context now has the previously thrown error, but also all of our unsanitized posted variables.  
+
+Combining this with the vulnerable template and we now have all the required steps for a reflected XSS!
+
+## Vulnerability Summary
+
+Causing an error by taking the honeypot bait does not strip or sanitize our variables, unlike the regular route.  
+This leads the tainted variables being printed in the page, and causes a reflected XSS!
+
+## Timeline
+
+* 2018/07/12: Original disclosure
+* 2018/07/17: Acknowledged the issues: They mentioned a 6-8 weeks timeline for a fix.
+* 2018/09/01: Asking for an update
+* 2018/09/05: They mentioned the ticket got lost in their bug tracking platform. 
+* 2018/09/29: [Partial fix committed](https://github.com/TryGhost/Ghost/commit/305d13e5c)
+* 2018/09/30: Fix released on version `2.4.0`
+* 2018/10/07: Fix released on versions `1.25.6` and `0.11.14`
+* 2018/11/19: Notified them of a partial, very low risk, bypass. Sent them my recommendations for a permanent fix.
+
+Note here that I never received an update since they acknowledged the ticket got lost, and still didn't hear from them to this day.  
+
+Also note that Ghost does not have a bug bounty program, so I did not receive a reward for this vulnerability.
+
+## Patch and partial bypass
+
+The patch for the vulnerability is [the following](https://github.com/TryGhost/Ghost/commit/305d13e5c):  
+```javascript
+function errorHandler(error, req, res, next) {
+    req.body.email = '';
+    req.body.subscribed_url = santizeUrl(req.body.subscribed_url);
+    req.body.subscribed_referrer = santizeUrl(req.body.subscribed_referrer);
+    // ...
+```
+
+Ghost added the [sanitizeURL](https://github.com/TryGhost/Ghost/blob/2.4.0/core/server/apps/subscribers/lib/router.js#L56) validation on the `errorHandler`.   
+```javascript
+function santizeUrl(url) {
+    return validator.isEmptyOrURL(url || '') ? url : '';
+}
+```
+
+Where `isEmptyOrUrl` checks if the URL is valid via the [validator](https://www.npmjs.com/package/validator) npm package,  where ghost checks the `isEmpty` part, and then call the `isUrl` method of [validator](https://www.npmjs.com/package/validator) if it's not empty.
+
+
+You might tell yourself:
+
+> Hey! A url can still contain a XSS, `http://test.com/#><script>` is a valid URL!
+
+And you would be right!  
+Pretty much everything after the hash is technically a valid url, and can contain  spaces and other symbols.  
+This does not work in this case as the validator package does not allow the `<>` characters.
+
+The relevant part of the check is [here](https://github.com/chriso/validator.js/blob/6.3.0/src/lib/isURL.js#L34):
+```javascript
+export default function isURL(url, options) {
+  assertString(url);
+  if (!url || url.length >= 2083 || /[\s<>]/.test(url)) {
+    return false;
+  }
+  if (url.indexOf('mailto:') === 0) {
+    return false;
+  }
+  // ...
+```
+
+The `/[\s<>]/` regex ensures that we don't send a less than or greater than symbol in the url, wherever it may be.
+
+What we can do however it add spaces, quotes and other characters in the value, to add attributes to the tag.
+
+If we have a look at the HTML in which our content is injected:
+
+```html
+<input class="location" type="hidden" name="location" value=OUR_URL />
+```
+It is trivial to escape the `value` attribue. As there are no quotes around the value, adding a space works.  
+If there were quotes, as our content isn't sanitized for attribute position, we could add a quote and keep on going.
+
+The reason why it is not a complete XSS like it previously was is because of the input type.
+
+With a regular input, we could modify it to have this form:
+
+```html
+<input class="location" type="text" name="location" value=x  onfocus="alert(document.domain)" autofocus />
+```
+Which would trigger the alert. But on a hidden input, as it's hidden we can't focus on it.
+This makes it a lot harder to have an XSS, and the resulting XSS will require user actions unlike the previous versions.
+  
+Garet Hayes made a great blog post on the PortSwigger blog: [XSS in hidden input fields](https://portswigger.net/blog/xss-in-hidden-input-fields), where setting an `accesskey` attribute and triggering it does launch the `onclick` event, even though the event is hidden.
+
+Here is a proof of concept:
+```html
+<input type="hidden" accesskey="X" onclick="alert(1)">
+```
+With this input, when the user presses `ALT+SHIFT+X` or `CMD+ALT+X` on OSX, the alert will launch.
+
+This does make it almost worthless as an input since there is no chance a user will manually press those keys, but it's still a reflected XSS.
+
+I have notified ghost of this bypass as well as the recommended solution on November 19th, but never received an answer.
+
+# Conclusion
+
+Unlike other big CMS such as WordPress and Joomla, as Ghost is publisher-focused, most visitors on the website won't have an account.  
+On the other CMS, there are plugins to create new features such as making an e-commerce website, allow comments or write your own p osts, which allows the users to create accounts. 
+
+This limits the attack scope to public content, which makes it a lot more secure by default, as you can't access most of the internal API as a guest.  
+Overall, while the security team did take a very long time to fix this and using a weak solution, the security of the application from an external attacker is pretty good as the scope is very limited.  
+
+---
+
+Follow me on [Twitter](https://twitter.com/AntoGarand) if you want to learn more about security and keep up to date regarding my publications!  
+The next post will be about **multiple stored XSS on Dev.to**, which was caused by a logic bug in the publication platform.
+
+---
+
+If you can provide invitation for private programs on any platform, feel free to send me an invite! You can contact me via twitter, DM's are open.

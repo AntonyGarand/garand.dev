@@ -1,0 +1,17 @@
+User-agent: *
+Allow: /
+
+# Sitemap
+Sitemap: https://garand.dev/sitemap_index.xml
+
+# Crawl-delay for respectful crawling
+Crawl-delay: 1
+
+# Allow all other content
+Allow: /blog/
+Allow: /download/
+Allow: /portfolio/
+Allow: /portfolio/web-development/
+Allow: /portfolio/cloud-infra/
+Allow: /portfolio/personal-projects/
+Allow: /privacy-policy/

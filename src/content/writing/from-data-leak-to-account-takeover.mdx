@@ -1,0 +1,110 @@
+---
+title: "From data leak to account takeover"
+description: "How I managed to compromise accounts from an information leak on a web application."
+publishDate: 2018-08-07
+updatedDate: 2018-08-13
+tags:
+  - security
+  - writeup
+draft: false
+---
+
+# Introduction
+
+While browsing the web, I ended up finding a startup which recently launched its product. Like any normal person, I decided to perform a security audit to hopefully find vulnerabilities!
+
+In this post, I will write about the journey, from the initial leak of my account information to complete arbitrary account takeover.
+
+For the purpose of this post, all identifiable information was replaced with mocked data.
+
+# Information leak
+
+When accessing the app for the first time, you could create an account.
+Creating an account did let you access your own profile, which contains few typical profile fields such as a name, email and profile picture.  
+
+The fields visible on the screen are not the only ones returned by the api though.
+When initially loading the page, a GET request would be made to the api to access our user information.
+This endpoint, `/api/user`, would also return what I believe is the whole stored document, including its private information.
+
+```javascript
+{
+  "user": {
+    "_id": "UUID",
+    "name": "My Name",
+    "role": "Other",
+    "email": "test@email.invalid",
+    "emailVerified": false,
+    "emailVerificationToken": "t3gauljva4dbu8zyn1xp6u",
+    "password": "$2a$10$HsQX/kYcnyly.oaykq5RxuC/IOrpSOVQnaPM18.NNxfkU/AFYaTzG",
+    "signupDate": "2018-07-11T20:39:31.070Z",
+    // ...
+  },
+  "teamInfo": {/* ... */ }
+}
+```
+
+Already, you can see that the password hash is beeing leaked, which is quite the security issue!  
+Leaking the hash lets hackers attempt to validate the password on their own machines, without any rate limits or logging mechanism in place. This makes it easier to bruteforce and impossible to detect!
+
+# Email validation
+
+From the previous information leak, you may have noticed the `emailVerificationToken` key on the user object.  
+Having access to this token means I could validate any email, as long as I have access to the validation URL and the leaked token.
+
+To try this out, I changed out the email for a valid one and received a genuine email validation link:
+
+```Markdown
+Thanks for signing up! To complete the sign-up process, please click the link below to verify your email:
+https://app.sample.com/verify/1234tokenhere
+```
+
+Now that I have the email validation link, I changed my email to one I did not control, such as `admin@application.com`.  
+Once my user profile updated, all I had to do was leak the new email token and verify my new email!
+
+# Password recovery
+
+When forgetting your password, a typical scenario is to enter your email, which then receives a password reset link.
+From this password reset link, you can enter an arbitrary new password, and log into your account!
+
+
+This application is not different, although it did not correctly protect its password reset tokens!  
+While the field was not present in the previously returned JSON, I did notice it was added when I triggered the first password reset request.  
+Like with the email verification link, I could therefore craft a valid password reset link myself!
+
+# Teams
+
+Until now, all we could do was only affecting our own user. Fortunately, looking closely at the previously leaked information, one may notice there is not only our own information returned, but also our team information!  
+We can create and manage teams from the application, and all of the team data will be leaked as well.
+
+```javascript
+{
+  "user": { /* ... */
+  },
+  "teamInfo": {
+    "owner": { /* ... */ },
+    "name": "Sample team",
+    "admins": [ /* ... */ ],
+    "members": [ /* ... */ ]
+  }
+}
+```
+
+The interesting part of the team leak is regarding the owner and members fields.  
+When being added into a team, I could therefore leak the team owner and all of its member's password reset tokens!  
+But this still limits the scope of the attack to members of our team, and we can do better than this.
+
+When owning a team, we can invite team members via their emails, and there is no confirmation required from the invited user.    
+
+This means that as a newly registered user, I can perform the following steps to overtake any account:  
+ - Perform a password change request for my target
+ - Create a new team
+ - Invite my target
+ - Leak the password reset token via my team information
+ - Change my victim's password
+
+As well as change and validate a new invalid email for this user, which would lock them out of their account.
+
+# Conclusion
+
+It is easy to send too much data to our front-end, but we need to be cautious about the sensible information which is stored.
+In this case, giving out too much information about a user led to a complete account takeover!

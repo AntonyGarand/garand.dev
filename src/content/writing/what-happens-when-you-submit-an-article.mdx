@@ -1,0 +1,338 @@
+---
+title: "What happens when you submit an article?"
+description: "Learn to navigate Dev.to's source code by understanding what happens when performing common actions!"
+publishDate: 2018-09-03
+updatedDate: 2018-09-04
+tags:
+  - opensource
+  - ruby
+  - javascript
+  - rails
+draft: false
+---
+
+# Under the hood of dev.to (Part 1)
+
+This article series will uncover the secrets of [dev.to](//dev.to)'s source code, helping the world understand and improve this application.  
+The source code is available on [github](https://github.com/thepracticaldev/dev.to), and you get [a cool badge](https://dev.to/badge/dev-contributor) for contributing!
+
+Disclaimer: I don't know ruby, nor ruby on rails, so there might be parts of this post which are incorrect or lacking. Feel free to point these out and I'll do my best to correct them!
+
+# Introduction
+
+Submitting an article is easy, right?
+
+All you need to do is press the `SAVE POST` button, and there we go!
+
+There is much more complexity to it, and in this post I'll uncover the magic happening behind the scenes!
+
+# Application overview
+
+Dev.to uses [Ruby On Rails](https://rubyonrails.org/) for its back-end, and [Preact](https://preactjs.com/) on the front-end.  
+The back-end hosts a REST api, and the front-end uses those to access and publish data.
+
+The front-end is a [Single Page Application](https://en.wikipedia.org/wiki/Single-page_application), but is also [Server Side Rendered](https://medium.freecodecamp.org/what-exactly-is-client-side-rendering-and-hows-it-different-from-server-side-rendering-bd5c786b340d).
+
+This means that if you access `dev.to/new` directly, the server will generate all of the HTML for you, ready for you browser to display it.
+Then, whenever the bundled preact scripts are loaded, we gain the SPA functionality: When trying to access a new page, it will be fetched by JavaScript, and preact will update the page content with the received html.
+
+
+
+# Showing the new article view
+
+Alright, so you want to write an article.  
+First, you head up to [dev.to/new](/new).
+
+Ruby on rails check its route in [/config/routes](https://github.com/thepracticaldev/dev.to/blob/92a494a1ea3ee3e02c208017eb1af1b6ef7466a7/config/routes.rb#L230) to find [/new](https://github.com/thepracticaldev/dev.to/blob/92a494a1ea3ee3e02c208017eb1af1b6ef7466a7/config/routes.rb#L230) using the GET protocol.
+
+This route tells it to load the `articles` controller, and the `new` method.
+```ruby
+get "/new" => "articles#new"
+get "/new/:template" => "articles#new"
+
+get "/pod" => "podcast_episodes#index"
+get "/readinglist" => "reading_list_items#index"
+
+```
+
+This controller can be found under [/app/controllers/articles_controller.rb](https://github.com/thepracticaldev/dev.to/blob/92a494a1ea3ee3e02c208017eb1af1b6ef7466a7/app/controllers/articles_controller.rb#L41).
+
+Before loading the `new` method, few permissions check will be executed.
+Those are declared on top of the controller, and includes method such as ensured you are logged in and preventing banned users from creating articles.
+
+```ruby
+
+class ArticlesController < ApplicationController
+  include ApplicationHelper
+  before_action :authenticate_user!, except: %i[feed new]
+  before_action :set_article, only: %i[edit update destroy]
+  before_action :raise_banned, only: %i[new create update]
+  before_action :set_cache_control_headers, only: %i[feed]
+  after_action :verify_authorized
+// ...
+```
+
+Once those are done, the `new` method is called:
+
+```ruby
+  def new
+    @user = current_user
+    @tag = Tag.find_by_name(params[:template])
+    @article = if @tag&.submission_template.present? && @user
+                 authorize Article
+                 Article.new(body_markdown: @tag.submission_template_customized(@user.name),
+                             processed_html: "")
+               else
+                 skip_authorization
+                 if params[:state] == "v2" || Rails.env.development?
+                   Article.new
+                 else
+                   Article.new(
+                     body_markdown: "---\ntitle: \npublished: false\ndescription: \ntags: \n---\n\n",
+                     processed_html: "",
+                   )
+                 end
+               end
+end
+```
+
+it is quite straightforward: It checks if you are using a template (Aka. using the path `/new/:template`), and loads either this template, or creates a generic [Front Matter](https://jekyllrb.com/docs/front-matter/) body.
+
+
+The Article.new represents the `New Article View`, available under [/app/views/articles/new.html.erb](https://github.com/thepracticaldev/dev.to/blob/92a494a1ea3ee3e02c208017eb1af1b6ef7466a7/app/views/articles/new.html.erb)
+
+```erb
+<% title "New Article - DEV" %>
+
+<% if user_signed_in? %>
+  <% if params[:state] == "v2" || Rails.env.development? %>
+    <%= javascript_pack_tag 'articleForm', defer: true %>
+    <%= render 'articles/v2_form' %>
+  <% else %>
+    <%= render 'articles/markdown_form' %>
+  <% end %>
+<% else %>
+  <%= render "devise/registrations/registration_form" %>
+<% end %>
+```
+
+This loads the correct view based on our conditions, typically [articles/markdown_form](https://github.com/thepracticaldev/dev.to/blob/92a494a1ea3ee3e02c208017eb1af1b6ef7466a7/app/views/articles/_markdown_form.html.erb)
+
+```erb
+<%= form_for(@article, html: {id:"article_markdown_form"}) do |f| %>
+  <% if @article.errors.any? %>
+    <div id="error_explanation">
+      <h2><%= pluralize(@article.errors.count, "error") %> prohibited this article from being saved:</h2>
+
+      <ul>
+      <% @article.errors.full_messages.each do |message| %>
+        <li><%= message %></li>
+      <% end %>
+      </ul>
+    </div>
+<% end %>
+
+<!-- ... -->
+```
+
+This form renders the HTML you usually see when accessing `dev.to/new`, we're finally there!
+The generated HTML is used as body in the [/app/views/layouts/application.html.erb](https://github.com/thepracticaldev/dev.to/blob/92a494a1ea3ee3e02c208017eb1af1b6ef7466a7/app/views/layouts/application.html.erb#L90) at some point in Ruby On Rails's magic.
+
+# Saving an article
+
+Alright, you've written your awesome article about how good [Ben Halpern's website](http://benhalpern.com/) is, and you now wish to publish it for everyone to see!
+
+You've set the `published` value to `true`, and you press this big blue `SAVE POST` button. What happens then?
+
+Your HTML was loaded, Preact loaded, and it listens to the click event for the SAVE button.
+
+## Front-end
+
+We're now in the front-end code, under [/app/javascript/article-form/articleForm.jsx](https://github.com/thepracticaldev/dev.to/blob/92a494a1ea3ee3e02c208017eb1af1b6ef7466a7/app/javascript/article-form/articleForm.jsx#L333).
+
+The button itself is under [elements/publishToggle.jsx](https://github.com/thepracticaldev/dev.to/blob/92a494a1ea3ee3e02c208017eb1af1b6ef7466a7/app/javascript/article-form/elements/publishToggle.jsx#L15), and our `articleForm.jsx` added an event listener for the click. 
+
+publishToggle.jsx:
+```jsx
+<button onClick={onPublish}>
+  {published ? 'SAVE CHANGES' : 'PUBLISH' }
+</button>
+```
+articleForm.jsx: 
+```jsx
+<PublishToggle
+  published={published}
+  onPublish={this.onPublish}
+  onSaveDraft={this.onSaveDraft}
+  onChange={linkState(this, 'published')}
+  // ...
+/>
+```
+
+articleForm.jsx: 
+```javascript
+onPublish = e => {
+  e.preventDefault();
+  this.setState({submitting: true, published: true})
+  let state = this.state;
+  state['published'] = true;
+  submitArticle(state, this.handleArticleError);
+};
+```
+
+The `submitArticle` function is imported from [./actions](https://github.com/thepracticaldev/dev.to/blob/92a494a1ea3ee3e02c208017eb1af1b6ef7466a7/app/javascript/article-form/actions.js#L21).
+
+actions.js - submitArticle
+```javascript
+export function submitArticle(payload, errorCb, failureCb) {
+  const method = payload.id ? 'PUT' : 'POST'
+  const url = payload.id ? '/api/articles/'+ payload.id : '/api/articles'
+  fetch(url, {
+    // ...
+    body: JSON.stringify({
+      article: payload,
+    })
+  })
+  .then(response => response.json())
+  .then(response => {
+    if (response.current_state_path) {
+      window.location.replace(response.current_state_path);
+    } else {
+      errorCb(response)
+    }
+  })
+  .catch(failureCb);
+}
+
+```
+
+Therefore, once you click the `SAVE ARTICLE` button, the following happens:  
+ - An article is created based on the current `state` variable
+ - The article is sent to `/api/articles`
+ - Once the save is complete, we're redirect to its new URL.
+
+We can now start digging into the back-end!
+
+## Back-end
+
+We're now receiving an article from the front-end in the form of a JSON file, at the `/api/articles` route via a POST. 
+
+### Routing
+
+Once again, in the [/config/routes.rb](https://github.com/thepracticaldev/dev.to/blob/92a494a1ea3ee3e02c208017eb1af1b6ef7466a7/config/routes.rb#L47) file, we need to search for our endpoint.
+
+There is an [api](https://github.com/thepracticaldev/dev.to/blob/92a494a1ea3ee3e02c208017eb1af1b6ef7466a7/config/routes.rb#L44) namespace which contains our [articles](https://github.com/thepracticaldev/dev.to/blob/92a494a1ea3ee3e02c208017eb1af1b6ef7466a7/config/routes.rb#L47) resource.
+
+[A Ruby on Rails Resource maps few default CRUD verbs to their respective methods](https://guides.rubyonrails.org/routing.html#crud-verbs-and-actions), so in our case the `POST` method will call the `articles#create` method.
+
+routes.rb
+```ruby
+namespace :api, defaults: { format: "json" } do
+  scope module: :v0,
+        constraints: ApiConstraints.new(version: 0, default: true) do
+    resources :articles, only: %i[index show create update] do
+      collection do
+        get "/onboarding", to: "articles#onboarding"
+      end
+    end
+    resources :comments
+// ...
+```
+### Controller
+
+We now are in the [/app/controllers/articles_controller](https://github.com/thepracticaldev/dev.to/blob/92a494a1ea3ee3e02c208017eb1af1b6ef7466a7/app/controllers/articles_controller.rb#L86), under the `create` method:
+
+```ruby
+def create
+  authorize Article
+  @user = current_user
+  @article = ArticleCreationService.
+    new(@user, article_params, job_opportunity_params).
+    create!
+  redirect_after_creation
+end
+```
+
+### Service
+
+This method calls the [ArticleCreationService](https://github.com/thepracticaldev/dev.to/blob/92a494a1ea3ee3e02c208017eb1af1b6ef7466a7/app/services/article_creation_service.rb#L10), which will create our article!
+
+```ruby
+def create!
+  raise if RateLimitChecker.new(user).limit_by_situation("published_article_creation")
+  article = Article.new(article_params)
+  article.user_id = user.id
+  article.show_comments = true
+  if user.organization_id.present? && article_params[:publish_under_org].to_i == 1
+    article.organization_id = user.organization_id
+  end
+  create_job_opportunity(article)
+  if article.save
+    if article.published
+      Notification.send_all(article, "Published")
+    end
+  end
+  article.decorate
+end
+```
+
+This services creates a new instance of the [Article](https://github.com/thepracticaldev/dev.to/blob/92a494a1ea3ee3e02c208017eb1af1b6ef7466a7/app/models/article.rb) model, and saves it.
+
+### Model 
+
+With Ruby on Rails, our models are [Active Records](https://guides.rubyonrails.org/active_record_basics.html), and have a bit of magic attached to it.
+
+While I won't dive into the database mapping part of the object, what I find interesting are the [before](https://github.com/thepracticaldev/dev.to/blob/92a494a1ea3ee3e02c208017eb1af1b6ef7466a7/app/models/article.rb#L43) methods, called when creating or saving an object.
+
+```ruby
+before_validation :evaluate_markdown
+before_validation :create_slug
+before_create     :create_password
+before_save       :set_all_dates
+before_save       :calculate_base_scores
+before_save       :set_caches
+after_save :async_score_calc, if: :published
+```
+
+The `before_validation` methods will be called before ensuring the object is valid.
+ - [evaluate_markdown](https://github.com/thepracticaldev/dev.to/blob/92a494a1ea3ee3e02c208017eb1af1b6ef7466a7/app/models/article.rb#L295) will convert our markdown to HTML  
+ - [create_slug](https://github.com/thepracticaldev/dev.to/blob/92a494a1ea3ee3e02c208017eb1af1b6ef7466a7/app/models/article.rb#L431) will create a most-likely unique slug for the URL
+ - [create_password](https://github.com/thepracticaldev/dev.to/blob/92a494a1ea3ee3e02c208017eb1af1b6ef7466a7/app/models/article.rb#L444) will make a unique preview password value
+
+The remaining methods should be quite explicit by their names.
+
+The model will also perform [many validations](https://github.com/thepracticaldev/dev.to/blob/92a494a1ea3ee3e02c208017eb1af1b6ef7466a7/app/models/article.rb#L20) on its properties.
+
+```ruby
+  validates :slug, presence: { if: :published? }, format: /\A[0-9a-z-]*\z/,
+                   uniqueness: { scope: :user_id }
+  validates :title, presence: true,
+                    length: { maximum: 128 }
+  validates :user_id, presence: true
+  validates :feed_source_url, uniqueness: { allow_blank: true }
+  validates :canonical_url,
+            url: { allow_blank: true, no_local: true, schemes: ["https", "http"] },
+uniqueness: { allow_blank: true }
+```
+
+# Conclusion
+
+Phew, this article is now saved! That was a lot of work for a simple action.
+
+As a quick recap, to view an article, we load the correct *Controller*, which loads a *View* and renders it to the page.  
+
+When trying to perform CRUD operations, we find the correct route based on our *API Resource*, which loads a *Controller*. This controller can interact with the data using *Services*, themselves using *Models* to interact with the database.
+
+---
+
+Now that the technical side is covered, I would like to get some feedback on this post.
+
+I have few objectives with this serie:
+1. Help people navigate through _big_ codebases and understand their architecture
+2. Lower the contribution entry-barrier for open-source projects such as this website.
+
+This is why feedback is important. 
+Did it help you understand the source?
+Perhaps there is something specific you would like to see?
+
+Please tell me in a comment below, and I'll do my best to improve this serie!

@@ -1,0 +1,41 @@
+---
+title: "Flipping Utilities"
+role: "Founder & Lead Engineer"
+year: 2021
+outcomeSummary: "Engineered a high-performance data ecosystem to visualize and analyze the RuneScape economy in real-time."
+overview: "Following the release of the RuneScape Wiki price API, I identified a gap for institutional-grade financial tools within the gaming community. I built a multi-platform suite to transform raw market data into actionable trading intelligence."
+problem: "Architecting a low-latency visualization platform capable of processing volatile market data for a massive concurrent user base."
+approach: "Iterative development starting from a Lean MVP (spreadsheets) to a distributed system comprising a web platform, Discord integration, and high-frequency data ingestors."
+constraints:
+  - "Near-real-time data synchronization"
+  - "Scalability for thousald of concurrent sessions"
+  - "Extensive UI/UX customizability for power users"
+keyDecisions:
+  - decision: "Database Migration to TimescaleDB"
+    reasoning: "Leveraged hyper-functions and compression to achieve a 90% reduction in storage footprint while maintaining full SQL compatibility and improving time-series query performance."
+    alternatives:
+      - "Standard PostgreSQL"
+      - "ClickHouse"
+  - decision: "Data Visualization via Apache ECharts"
+    reasoning: "Selected for its high-performance canvas rendering and declarative configuration, allowing for complex financial charting without sacrificing frame rates."
+techStack:
+  - "React"
+  - "TypeScript"
+  - "Node.js"
+  - "TimescaleDB (PostgreSQL)"
+  - "Prometheus & Grafana"
+  - "Docker & Linux self-hosting"
+impact:
+  metrics:
+    - label: "Total Reach"
+      value: "100k+ users across the ecosystem"
+    - label: "Data Scale"
+      value: "1B+ price points indexed and served"
+  qualitative: "Engineered a centralized API gateway that standardized rate limiting, auth, and observability, resulting in a significant increase in feature deployment velocity."
+learnings:
+  - "Community-driven development requires a rigorous balance between feature roadmaps and technical debt management."
+  - "Full-stack self-hosting at scale provides deep insights into Linux networking and hardware orchestration."
+  - "Effective data storytelling is the primary differentiator in high-value analytical tools."
+featured: true
+order: 1
+---

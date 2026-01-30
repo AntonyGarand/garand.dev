@@ -1,0 +1,254 @@
+---
+title: "PHP: Return true to win - WriteUp (Part 2)"
+description: "Returntrue.win is a website containing many challenges where you supply the input of a function which needs to return true. This posts covers the solutions to these challenges."
+publishDate: 2018-06-29
+updatedDate: 2018-06-30
+tags:
+  - challenge
+  - php
+  - writeup
+draft: false
+---
+
+# Introduction
+
+Welcome to the second part of the [Returntrue.win](https://returntrue.win/) writeup!  
+Hopefully you already did read and understand the first half of those challenge. While not required, it is recommended to read it [Here](https://dev.to/antogarand/php-return-true-to-win---writeup-part-1-9bo) first!
+
+Now is the time to stop reading and try to solve the challenges yourself before reading on the solutions!
+
+Website: [https://returntrue.win](https://returntrue.win/)
+
+## Level 9
+
+#### Challenge
+```php
+function foo($x)
+{
+    $y = $x + 1;
+    return ++$x != $y;
+}
+```
+#### Solution
+```php
+foo(x);
+```
+
+#### Explanation
+The solution here is lies in how PHP implemented the [increment](https://secure.php.net/manual/en/language.operators.increment.php) operator.  
+While you might expect `++$x` to convert `$x` to a number before converting it, it actually will return the next character in the alphabet.  
+In our case, `++$x` is equal to `y` as it is the next letter following `x`,
+`$y` will be a number, aka. `1`, as it is the result of an addition.
+
+The final comparison therefore is `'y' != 1`, which is true!
+
+## Level 10
+
+#### Challenge
+```php
+class Bar
+{
+    private $a;
+
+    public function __construct($a)
+    {
+        $this->a = (bool) $a;
+    }
+
+    public function a()
+    {
+        return $this->a;
+    }
+}
+
+function foo(callable $x)
+{
+    $object = new Bar(false);
+    $x($object);
+    return $object->a();
+}
+```
+
+#### Solution
+```php
+foo(function(&$a){$a=new$a(1);});
+```
+
+#### Explanation
+This one is tricky, and fun!
+
+Here is how the long, unminified, version of the answer might look like:
+```php
+foo(function(&$barInstance) {
+    $barInstance = new Bar(true);
+});
+```
+As we are given `$object` as argument in our function, using it as a [reference](https://secure.php.net/manual/en/language.references.pass.php) lets us modify it.  
+We can't easily modify the `a` property of this object as it is private, but we can reassign the variable to be a new instance of Bar!
+
+The minified version uses few tricks to shorten the payload:  
+* Use `1` instead of `true` in the constructor, which works as the `Bar` constructor casts the element to a boolean  
+* Create a new instance of a class from an instance, [as documented here](https://secure.php.net/manual  /en/language.oop5.basic.php#language.oop5.basic.new#example-174)
+* Remove all unnecessary spaces and indentation  
+
+The most interesting part of the shortest payload here is the creation of a new `Bar` instance using `new $a(1)`, which I didn't know about before reading the solutions!
+
+## Level 11
+
+#### Challenge
+```php
+function foo(array $x)
+{
+    return $x[0] === null;
+}
+```
+#### Solution
+```php
+foo([]);
+```
+
+#### Explanation
+Arrays undefined offset will return null if accessed, therefore an empty array will pass this check.
+
+## Level 12
+
+#### Challenge
+```php
+function foo($x)
+{
+    return $x[123456] !== null
+        && $x[123456] === $x[123457];
+}
+```
+#### Solution
+```php
+foo(x);
+```
+
+#### Explanation
+This may seem weird at first, but the answer is to pass any string.  
+Accessing an invalid char index on a string will return an empty string `''`, which passes all conditions.  
+It is equivalent to the following array, with additional notices printed out:
+`[123456 => '', '']`
+
+##### Reference:
+[StackOverflow: Finding the next numeric index of an array](https://stackoverflow.com/a/3698786/5399585)
+
+## Level 13
+
+#### Challenge
+```php
+class Test
+{
+    private $foo = true;
+}
+
+function foo($x)
+{
+    $o = (array) new Test;
+    return $o[$x];
+}
+```
+
+#### Solution
+```php
+foo("\00Test\00foo");
+```
+
+#### Explanation
+The solution resides in knowing how [array casting](https://secure.php.net/manual/en/language.types.array.php#language.types.array.casting) works.  
+> The keys are the member variable names, with a few notable exceptions:  
+> \[...] private variables have the class name prepended to the variable name;  
+> \[...] These prepended values have null bytes on either side.  
+As `foo` is a private property of `Test`, its array key is `Testfoo` with nullbytes before `Test` and `foo`.  
+
+To obtain the shortest score of 11, you need to replace both escaped nullbytes `\00` with a *real* nullbyte in the POSTed request.  
+I'll leave this as a challenge to the reader!
+
+## Level 14
+
+#### Challenge
+```php
+function foo($x)
+{
+    return is_object($x) && is_object($x());
+}
+```
+#### Solution
+```php
+foo(function(){yield;});
+```
+
+#### Explanation
+The solution is simple once explained, but really tricky to find out.
+
+The first required knowledge is that anonymous functions are represented by the [Closure](https://secure.php.net/manual/en/class.closure.php) class in PHP.  
+This lets us pass the first `is_object($x)` using less characters than creating a callable object.
+
+The second required knowledge is PHP's [generators](https://secure.php.net/manual/en/language.generators.syntax.php).  
+The `yield` keyword returns a Generator, which can be used to continue the execution later on.
+
+This leads us to this very short 18 characters solution!
+
+## Level 15
+
+#### Challenge
+```php
+function foo($value)
+{
+    return $value != $value;
+}
+```
+#### Solution
+```php
+foo(NAN);
+```
+
+#### Explanation
+The [NAN](https://secure.php.net/manual/en/math.constants.php) constant is not equal to itself due the IEEE754 spec.  
+More details on [this stackoverflow](https://stackoverflow.com/questions/1565164/what-is-the-rationale-for-all-comparisons-returning-false-for-ieee754-nan-values) question.
+
+## Level 16
+
+#### Challenge
+```php
+function foo($x)
+{
+    // This level is slightly different than level 12
+    // the comparison is != instead of !== ;)
+    return $x[123456] != null
+        && $x[123456] === $x[123457];
+}
+```
+
+#### Solution
+```php
+foo([123456=>1,1]);
+```
+
+#### Explanation
+Unlike challenge 12, the loose equality comparison does not let us use a string to pass the first condition.
+
+The reason why this solution works is that PHP increments the last inserted numeric key to create its next values.  
+In this case, as the first inserted key is `123456`, the second one will be `123457`, both having the value of 1.  
+
+# Conclusion
+
+Those were lots of original solutions to the challenge!
+Most of those solutions did produce warnings and notices, therefore most of the odd behavior should be detected in a proper development environment.
+
+If you like learning about weird behaviors and challenges, make sure to follow me on [Twitter](https://twitter.com/AntoGarand) where I post about this kind of stuff
+
+Like on my previous blog post, I would like to thank:
+- [@matthieunapoli](https://twitter.com/matthieunapoli) for making this awesome website
+- [@MarcS0h](https://twitter.com/MarcS0h) for solving the easiest challenges while I was tackling the hard ones
+- [@rpkamp82](https://twitter.com/rpkamp82), for his [Writeup](https://www.rpkamp.com/2018/02/15/all-answers-to-returntrue.win-with-explanations/) on returntrue.win
+- [@dopitz](https://twitter.com/dopitz) for his [gist](https://gist.github.com/odan/0799dfa59d40acdb18e8a1fa9611a996) containing many short solutions
+
+If you do know similar oddities or challenge websites, please do send them my way so I can solve and write about them!
+
+# References
+https://returntrue.win
+https://gist.github.com/odan/0799dfa59d40acdb18e8a1fa9611a996
+https://www.rpkamp.com/2018/02/15/all-answers-to-returntrue.win-with-explanations/
+https://alf.nu/ReturnTrue - Similar website for JavaScript

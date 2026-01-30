@@ -1,0 +1,117 @@
+---
+title: "JavaScript: Watch out for unwanted hoisting!"
+description: "JavaScript hoisting is fun, but we need to be aware of its working to prevent vulnerable code."
+publishDate: 2018-06-10
+tags:
+  - javascript
+  - challenge
+  - hoisting
+draft: false
+---
+
+# Challenge
+
+Let me start of this post with a small challenge.  
+Replace `// Your code here` with actual code, and print `Flag`!
+
+```javascript
+function generateSecret() {
+  return Date.now() + Math.random() * 10000;
+}
+
+const mySecretKey = generateSecret();
+
+// Your code here
+
+if (mySecretKey === 42) {
+    console.log('Flag!');
+} else {
+    console.log('Bad secret!');
+}
+```
+
+# Writeup 
+
+In order to print the Flag, we need to understand how function hoisting works.
+
+```javascript
+myFunction();
+
+function myFunction() {
+    console.log('My function was called!');
+}
+```
+This snippet is valid and will correctly print `My function was called!`, even though this function is declared after it has been called.  
+This works thanks to [Hoisting](https://developer.mozilla.org/en-US/docs/Glossary/Hoisting).
+
+Here is a quick definition from MDN:
+> Conceptually, for example, a strict definition of hoisting suggests that variable and function declarations are physically moved to the top of your code, but this is not in fact what happens. Instead, the variable and function declarations are put into memory during the compile phase, but stay exactly where you typed them in your coding.
+
+This means that the previous code can be understood as:
+```javascript
+function myFunction() {
+    console.log('My function was called!');
+}
+
+myFunction();
+```
+The function declarations and definitions are moved before the actual code happens, which lets us use functions before they are declared.
+But what happens if we declare the same function twice?
+
+```javascript
+function myFunction() {
+    console.log('My function was called!');
+}
+
+myFunction();
+
+function myFunction() {
+    console.log('My *evil* function was called!');
+}
+```
+Spoiler alert: The evil function is called!
+
+Once hoisted, the previous code can be understood as:
+```javascript
+function myFunction() {
+    console.log('My function was called!');
+}
+function myFunction() {
+    console.log('My *evil* function was called!');
+}
+
+myFunction();
+```
+
+As the last declaration of `myFunction` is the evil one, all of the calls to `myFunction` will be to the evil function!
+
+# Solution
+
+In order to solve the challenge, we therefore only need to redeclare the `generateSecret` function.
+```javascript
+function generateSecret() {
+  return Date.now() + Math.random() * 10000;
+}
+
+const mySecretKey = generateSecret();
+
+// Your code here
+function generateSecret() {
+  return 42;
+}
+
+if (mySecretKey === 42) {
+    console.log('Flag!');
+} else {
+    console.log('Bad secret!');
+}
+```
+
+# References
+
+MDN: [Hoisting](https://developer.mozilla.org/en-US/docs/Glossary/Hoisting)  
+MDN: [Function](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/function)  
+Medium: [Hoist your knowledge of JavaScript hoisting](https://medium.com/byteconf/hoist-your-knowledge-of-javascript-hoisting-a3db96c029d5)
+
+
+<small>[Original on GitLab](https://gitlab.com/AntonyGarand/javascript-quirks/blob/master/writeups/1-hoisting.md)</small>

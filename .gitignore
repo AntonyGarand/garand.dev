@@ -3,6 +3,8 @@ dist/
 
 # generated types
 .astro/
+.sisyphus
+
 
 # dependencies
 node_modules/

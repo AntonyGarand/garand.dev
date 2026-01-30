@@ -1,0 +1,121 @@
+---
+title: "Making a simple fuzzer for Tixy"
+description: "You might have heard about tixy.land, the minimalist javascript playground for creative coding...."
+publishDate: 2020-12-31
+tags:
+  - javascript
+  - experiment
+  - codemods
+draft: false
+---
+
+You might have heard about [tixy.land](https://tixy.land/), the minimalist javascript playground for creative coding.
+
+While scrolling on the tixy feed, being amazed by how creative people can be, I stumbled upon a discussion between Martin Kleppe, the creator of Tixy, and Gareth Heyes, a well known security researcher, regarding creating a Fuzzer for tixy:
+
+As I had experience with code modification tools, I decided to try hacking something up and make a quick fuzzer!
+
+Want to see the result first?
+
+<small>Possible flashes warning</small>
+Sure, [click here](https://garand.dev/projects/tixy/gallery)!
+
+# Getting started
+
+## Tixy setup
+
+Setting up tixy locally is pretty easy, especially since it's on [github](https://github.com/aemkei/tixy/tree/main/src)!  
+However, since I only wanted to change the javascript a bit, I wanted a single file, `index.html`, without having to compile the CSS myself.  
+I ended up copying the html of the live version at tixy.land, and replacing the `script` content with the not minified [index.js](https://github.com/aemkei/tixy/blob/main/src/index.js) from the repo, and replacing the imported `example.json` with a variable having the same value.
+
+## Adding jscodeshift
+
+[JSCodeShift](https://github.com/facebook/jscodeshift) is a powerful tool to navigate and modify the [AST](https://en.wikipedia.org/wiki/Abstract_syntax_tree) of source code which I'll be using.  
+Adding [jscodeshift](https://github.com/facebook/jscodeshift) was slightly harder than setting tixy up: As I wanted to keep things simple, I couldn't use the existing npm version as it would require compiling the project.  
+I ended up using [Browserify](http://browserify.org/) to compile it to a single file:
+
+```bash
+npx browserify jscodeshift/index.js -o jscodeshift.min.js --standalone jscodeshift
+```
+
+I then copied this file into my project, added a reference to it in the HTML, and was ready to go!
+
+## Getting samples
+
+To fuzz values, we need to start by gathering existing examples, ideally ones with interesting effects.  
+I ended up merging the existing `examples.json` and the ones under the [tixy.land/gallery](https://tixy.land/gallery/) page.
+
+# Making the fuzzer
+
+With our setup in place, let's start thinking about how to actually implement the fuzzer.
+
+Here is a rough outline of the plan:
+
+1. Pick random samples out of the examples
+2. Convert them to random fragments
+3. Merge the fragments together
+
+To split the project into smaller samples, we need to figure out exactly where to split!  
+After analyzing few of the tixies on [astexplorer](https://astexplorer.net/#/gist/0a5ae3ae8c84c3304f9dccbe9f53134c/1100ed46cc1e3897b483d92659ffab6d14874b30), I ended up picking two distinct operations which can usually be extracted without issues:
+_Binary Expressions_ and _Call Expressions_!
+
+**Binary Expressions** are mostly arithmetic operators such as `+` and `-`, with few other exceptions.
+You can view the complete list of these operators on the [ast-types](https://github.com/benjamn/ast-types/blob/master/def/core-operators.ts#L1) repository.  
+Extracting the binary expression node is picking both sides of the equation as well as the operator itself, and they are typically self-contained.
+
+**Call Expressions** are function calls, such as `Math.random()` or `sin(y)`. Like the binary expressions, they usually are self contained, and small enough to extract without issues.
+
+Now that we know _what_ to extract, let's start on the _how_ to extract them!
+
+Picking random samples is simple: Pick a size, and pick random elements of the `examples` array!  
+In this case, I picked an arbitrary size of `8` for the biggest sample count, for no particular reason.
+
+```javascript
+const sampleCount = Math.floor(Math.random() * 8) + 1;
+const samples = new Array(sampleCount)
+  .fill(0)
+  .map(() => pickRandom(allSamples));
+```
+
+Separating them by valid fragments is where we start using JSCodeShift.  
+From a string with valid JavaScript code, we can create our own `jscodeshift` instance with it by calling `jscodeshift(code)`.
+
+Then, using the `.find` method on the resulting object with a type such as `BinaryExpression` gives us an array-like object with all of the binary expressions.  
+Finally, to convert the AST node returned by JSCodeShift back to JavaScript, we need to call the `toSource` method.
+
+Simple, isn't it?
+
+Here is how the resulting code looks:
+
+```javascript
+const availableOperations = [];
+const jsc = jscodeshift(sample);
+jsc.find("BinaryExpression").forEach((v) => availableOperations.push(v));
+const chosenSnippet = pickRandom(availableOperations);
+const resultingCode = jscodeshift(chosenSnippet).toSource();
+```
+
+Finally, doing this on all of our selected samples, and on both binary expressions and call expressions, we end up with an array of random code snippets.
+
+Now, to merge the fragments back together, I decided to add a random operator between each of them.  
+Thankfully, as both sides should be valid JavaScript strings, there is no need to use JSCodeShift anymore, a simple concatenation will do.
+
+```javascript
+const delimiters = ["+", "-", "*", "%", "|", "<<", ">>", "%", "^"];
+const newCode = fragments.reduce((acc, v) => {
+  return (acc ? acc + pickRandom(delimiters) : "") + v;
+}, "");
+```
+
+# Result
+
+Where would be the fun of generating random snippets if we couldn't view the results!
+
+I ripped the existing `nextExample` function of the existing `tixy` site and instead of using the next examples, used a random code snippet from the fuzzer.
+
+Now, for the amazing results, I saved you the hassle of doing it yourself! Instead, you can visit <a href="https://garand.dev/projects/tixy/?code=-y%2Fmax(x-8%2Cy-8%2C7-x%2C7-y)*(hypot(x-t%2510%2Cy-t%258)%20-%20t%252*9)%3E%3EMath.sin(t)%251%2F32*y-t%258%25(x-8)%2Fy">garand.dev/projects/tixy/</a>, and click on the tixy until you find interesting results!  
+For maximum viewing pleasure, I also swapped the gallery page to use my fuzzer instead of good examples: https://garand.dev/projects/tixy/gallery
+
+Many of them are either a stroboscopic nightmare or an exact ripoff of the examples, but sometimes there are interesting patterns emerging.
+
+Found any interesting ones? Please link to them in the comments! I'd love to see what can come out of this project!

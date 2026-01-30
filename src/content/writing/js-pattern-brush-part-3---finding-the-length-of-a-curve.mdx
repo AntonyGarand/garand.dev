@@ -1,0 +1,149 @@
+---
+title: "JS Pattern brush: Part 3 - Finding the length of a curve"
+description: "This is an article series in which we will build a pattern brush in JavaScript. This third part covers find the length of our Bézier curve!"
+publishDate: 2019-01-22
+updatedDate: 2020-01-17
+tags:
+  - javascript
+  - svg
+  - graphics
+draft: false
+---
+
+# Introduction
+
+And here we are, in the third part of the JS Pattern brush series!
+
+In the [last post](https://dev.to/antogarand/js-pattern-brush-part-2---bezier-tangent-and-normal-fhf), we learned how to find the tangent and normal of a point on the curve.
+
+In this post, we will learn how to find the length of our curve using a simple subdivision algorithm, and learn about few other available algorithms we can use for this same task.
+
+# Table of contents
+
+  <ul>
+    <li>[Introduction](#introduction)</li>
+    <li>[Table of contents](#table-of-contents)</li>
+    <li>[Finding the length of a cubic curve](#finding-the-length-of-a-cubic-curve)</li>
+    <ul>
+        <li>[Subdivision](#subdivision)</li>
+        <ul>
+            <li>[Based off distance](#based-off-distance)</li>
+            <li>[Based off the straightness of the curve](#based-off-the-straightness-of-the-curve)</li>
+        </ul>
+    </ul>
+    <li>[Conclusion](#conclusion)</li>
+  </ul>
+
+# Finding the length of a cubic curve
+
+Note that this segment is to find the length of a **cubic** curve, you can find the exact length of a quadratic curve using better algorithms.
+
+In order to repeat an SVG along a line, I need to find out how many of those will be needed for the whole line.  
+If my SVG is 10px wide and the curve is 50 pixels long, I will need to repeat my icon 5 times, seems simple doesn't it?
+
+Well, it turns out there isn't an easy solution to this problem. It turns out, when [a stackexchange answer](https://math.stackexchange.com/a/61796) recommends you to read a couple of papers, the solution isn't as simple as expected.  
+
+> See these papers:
+> * [Approximate Arc Length Parametrization](http://www.visgraf.impa.br/sibgrapi96/trabs/abst/a14.html), in SIBGRAPI 1996.
+> * [Adaptive sampling of parametric curves](http://www.tecgraf.puc-rio.br/~lhf/ftp/doc/g5011.ps.gz), in Graphics Gems V, 1995.
+> * [Computing the arc length of parametric curves](http://dx.doi.org/10.1109/38.55155), IEEE Computer Graphics and Applications, 1990.
+> * [Point-based methods for estimating the length of a parametric curve](http://dx.doi.org/10.1016/j.cam.2005.10.001), Journal of Computational and Applied Mathematics, 2006.
+
+It turns out there isn't an easy, cheap way of finding this information, you can only approximate it using few variations.
+
+## Subdivision
+
+While there are different ways of calculating its length, I ended up using an easy and bruteforcy solution, using **subdivision**. 
+ 
+The theory behind this method is quite simple:  
+* For N steps between 0 and 1:  
+    * Find the position of the point at position T  
+    * Find the distance between this point and the previous position  
+    * Add this distance to the calculated length of the curve
+
+Now that we know the algorithm, let's implement it!
+
+As we always will need the length of the curve, I added the length logic in the constructor.  
+Note that won't update the curve if you manually update any of the points, so keep that in mind if you want to modify your Bezier instance!
+
+```javascript
+let length = 0;
+const steps = 100;
+const stepSize = 1 / steps;
+
+let lastPoint = p0;
+for (let i = 1; i <= steps; i++) {
+  const time = stepSize * i;
+  const currentPoint = this.point(time);
+  length += currentPoint.distance(lastPoint);
+  lastPoint = currentPoint;
+}
+this.length = length;
+```
+
+The precision and complexity can be changed with the `steps` variable.  
+From my experience, 20 seems to give a good approximation, and 100 is very precise, more than enough for my need.  
+This always depends on the length and complexity of the curve, the sharper the edges and the longer the curve, the less precise this method will be.
+
+You might have noticed I'm using a new method of the `Vector` class here: `distance`
+
+This is pretty simple using the pythagorean theorem, so let's implement it as well:
+
+```javascript
+class Vector {
+  // ...
+  distance(other){
+    if(this.equals(other)){
+      return 0;
+    }
+    return Math.sqrt(
+      Math.abs(this.x - other.x)**2 +
+      Math.abs(this.y - other.y)**2
+    );
+  }
+
+  equals(other){
+    return this.x === other.x && this.y === other.y;
+  }
+
+}
+```
+
+## Adaptive subdivision
+To get a more precise length, we can use Adaptative subdivision instead of our current static subdivision.
+
+An adaptative subdivision will keep subdividing until certain conditions are met, such as the straightness of the curve or the distance between two points.
+
+Such an algorithm is beneficial as it adjusts its calculation based off the curve length and edges, which gives it a better precision.
+
+While I won't implement any of these algorithms for the moment, I will still introduce them, and perhaps cover them in a later post!
+
+### Based off distance
+
+The previous solution splits the curve in a fixed amount of points, which means that in small curves, it will be too precise, while in very large curves, it can lack precision.
+
+The solution to this problem is to subdivide the curve recursively, until the distance between your two subdivision is small enough.  
+This works until we have a curve with a loop, or two very close segments.
+The distance between two points doesn't always correlate to their distance in the time of the curve, as they can be very close to each other yet at completely opposite spectrum of the curve.  
+In order to reduce those collisions, we can enforce a minimal `t` distance between the points before we check for their distance.
+
+![Loop inside a curve](/images/blog/q3o64h0fuqe5ianq2dda-1.png)
+
+### Based off the straightness of the curve
+
+An alternative solution would be to split the curves in two  smaller curves until they are `flat`. When the curve is considered straight enough, you add the distance between the two points.  
+This approach has the benefits of making a single segment for long, flat areas of the curve, while making many segments for curved areas.
+  
+> [Adaptive Subdivision of Bezier Curves - Antigrain Geometry](http://antigrain.com/research/adaptive_bezier/index.html)
+> ![Adaptive subdivision of curves](/images/blog/mcjer3dipxmqg2tni0ic-1.gif)
+
+While I still did not implement this version, it is one of the method I wish to explore later on.  
+This approach is definitely more precise and can factor in the height of your original svg, but might be a lot more expensive depending on the curve size, subdivision cost and straightness-comparison cost.
+
+# Conclusion
+
+This week's post was a short one, but be prepared, as next week we will build the first working pattern brush!
+
+While it will be a bit distorted or stretched on various places, it will help us visualize our initial idea and find out the limitations of our approach.
+
+As always, the source code is available on [Gitlab](https://gitlab.com/AntonyGarand/pattern-brush/tree/part-3-curve-length), and feel free to comment or reach out on [Twitter](https://twitter.com/antogarand) if you have any questions or feedback!

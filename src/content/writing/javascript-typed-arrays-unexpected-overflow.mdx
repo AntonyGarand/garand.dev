@@ -1,0 +1,94 @@
+---
+title: "JavaScript typed arrays: Unexpected overflow"
+description: "An odd behavior from JavaScript typed arrays"
+publishDate: 2019-02-12
+tags:
+  - javascript
+draft: false
+---
+
+In today's post, I will explain a particular situation which can occur in JavaScript if you use typed arrays.
+
+This isn't my discovery, I found out in [this blog post](https://nullprogram.com/blog/2019/01/23/) by Chris Wellons, but I found the quirk so interesting I wish to discuss it in my own post.
+
+As you know, in JavaScript, all numbers are doubles, excluding two situations:
+
+- Bitwise operations
+- Typed arrays
+
+In bitwise operations, the decimal section of the number is ignored.
+
+```javascript
+console.log(2.99999999999999 ^ 2);
+```
+
+In this example, the answer is `0`, as the operation performed is actually `2 ^ 2`.
+
+Typed arrays are a bit similar, they store only various type of integers.
+Here is an example using an Uint8 array, which can only contain 8 bit integers.
+
+```javascript
+const first = Uint8Array.of(123);
+const second = Uint8Array.of(456);
+console.log(first[0], second[0]);
+```
+
+The result of these two logs is `123`, and `200`.
+The `200` might be unexpected, but as mentioned earlier, the arrays can only contain 8 bit unsigned integers.
+
+The maximal value which can be stored by 8 bits is `255`. As `456` is bigger than `255`, we cause an [integer overflow](https://en.wikipedia.org/wiki/Integer_overflow), and start over at 0.
+
+We can confirm this with the following example:
+
+```javascript
+const arr = Uint8Array.of(255);
+++arr[0];
+console.log(arr[0]);
+```
+
+The result of this operation is `0`, as we incremented `255` to `256`, therefore triggering an overflow.  
+As we overflowed by a single number, we start over at `0`.
+
+---
+
+Now, let's get to the interesting quirk which I mentioned in the introduction.
+
+As we already know, `255 + 1` in a uint8 array is 0.
+
+With this in mind, what would you expect to be the result of the following code?
+
+```javascript
+const arr = Uint8Array.of(255);
+const x = ++arr[0];
+console.log(x, arr[0]);
+```
+
+The only difference between this code and the previous snippet is that we assign the result of the `++` increment operator to a variable.
+
+As the value of `arr[0]` is `0`, we would expect them both to be `0`, right?
+
+Let's find out!
+
+```javascript
+const arr = Uint8Array.of(255);
+const x = ++arr[0];
+console.log(x, arr[0]);
+```
+
+As it turns out, the value of `x` is `256`, and not `0`!
+
+The reason behind this weird quirk is because of the types during the manipulations.
+
+In Javascript, during regular arithmetic operations, we use the `Number` type (And soon, BigInt!). As the increment operator is equivalent to `1 + [value]`, both numbers are converted to `Number` during the operation.
+
+Once the operation is done, two things happen:
+
+1. We store the result of the operation in the `arr` array.
+2. We store the result of the operation in the `x` value.
+
+Notice how on step 2, we use the result of the operation instead of the value inside `arr`!  
+As the result is the addition of two `Number`, we didn't cause an integer overflow, and therefore our value is `256` instead of `0`!
+
+Hopefully you found this quirk as interesting as I did!
+
+If you wish to learn more about this, I suggest you to check out [Chris's blog post](https://nullprogram.com/blog/2019/01/23/), in which he compares the behavior with `C`, as well as links to the exact Ecma spec where this is defined!

