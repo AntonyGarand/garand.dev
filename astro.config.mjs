@@ -18,9 +18,9 @@
  * @see https://astro.build/config
  */
 
-import { defineConfig, envField } from "astro/config";
 import mdx from "@astrojs/mdx";
 import sitemap from "@astrojs/sitemap";
+import { defineConfig, envField } from "astro/config";
 
 /**
  * Astro configuration object
