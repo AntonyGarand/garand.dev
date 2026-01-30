@@ -229,12 +229,8 @@ export default defineConfig({
   redirects: {
     // Links from my old site
     "/projects/pattern-brush": "/pattern-brush/index.html",
-    "/projects/pattern-brush/index.html": "/pattern-brush/index.html",
     "/projects/metaballs": "/metaballs/index.html",
-    "/projects/metaballs/index.html": "/metaballs/index.html",
-    "/projects/metaballs/gallery.html": "/metaballs/gallery.html",
-    "/projects/tixy/index.html": "/tixy/index.html",
+    "/projects/metaballs/gallery": "/metaballs/gallery.html",
     "/projects/sailing": "/sailing/index.html",
-    "/projects/sailing/index.html": "/sailing/index.html",
   }
 });
