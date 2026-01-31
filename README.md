@@ -17,3 +17,4 @@ Todos:
   - ~~Write a new post about leaving amazon~~
   - Write about my time as a teacher in Quebec for SMBs on the new security measures
 - Add comments via github
+- Add option to remove dynamic background
