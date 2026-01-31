@@ -202,10 +202,16 @@ const pageTitle = currentPage === 1
   </main>
 
   <script>
-    const filterState = new URLSearchParams(window.location.search).get('filter') || 'all';
+    declare global {
+      interface Window {
+        setFilter: (filter: 'all' | 'post' | 'note') => void;
+      }
+    }
+
+    const filterState = (new URLSearchParams(window.location.search).get('filter') || 'all') as 'all' | 'post' | 'note';
     let currentFilter = filterState;
 
-    function setFilter(filter) {
+    function setFilter(filter: 'all' | 'post' | 'note') {
       currentFilter = filter;
       const url = new URL(window.location.href);
       url.searchParams.set('filter', filter);
@@ -215,17 +221,17 @@ const pageTitle = currentPage === 1
       updatePageStats(filter);
     }
 
-    function updateActiveButton(filter) {
+    function updateActiveButton(filter: 'all' | 'post' | 'note') {
       document.querySelectorAll('.filter-tabs button').forEach((btn) => {
-        const typedBtn = btn;
+        const typedBtn = btn as HTMLElement;
         typedBtn.classList.toggle('active', typedBtn.dataset.filter === filter);
       });
     }
 
-    function updateCardVisibility(filter) {
+    function updateCardVisibility(filter: 'all' | 'post' | 'note') {
       const cards = document.querySelectorAll('.card-item');
       cards.forEach((card) => {
-        const typedCard = card;
+        const typedCard = card as HTMLElement;
         const types = typedCard.dataset.type || '';
         const shouldShow =
           filter === 'all' || types.includes(filter);
@@ -233,7 +239,7 @@ const pageTitle = currentPage === 1
       });
     }
 
-    function updatePageStats(filter) {
+    function updatePageStats(filter: 'all' | 'post' | 'note') {
       const countsContainer = document.getElementById('filter-counts');
       if (!countsContainer) return;
 
@@ -262,7 +268,7 @@ const pageTitle = currentPage === 1
 
       // Listen for back/forward navigation
       window.addEventListener('popstate', () => {
-        const newFilter = new URLSearchParams(window.location.search).get('filter') || 'all';
+        const newFilter = (new URLSearchParams(window.location.search).get('filter') || 'all') as 'all' | 'post' | 'note';
         currentFilter = newFilter;
         updateActiveButton(newFilter);
         updateCardVisibility(newFilter);
