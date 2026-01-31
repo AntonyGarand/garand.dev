@@ -19,12 +19,15 @@
 interface Props {
   /** Statistics text to display (e.g., "12 articles", "Showing 1-10 of 45") */
   text: string;
+
+  /** Optional HTML id for the element (useful for JavaScript manipulation) */
+  id?: string;
 }
 
-const { text } = Astro.props;
+const { text, id } = Astro.props;
 ---
 
-<p class="page-stats">{text}</p>
+<p class="page-stats" id={id}>{text}</p>
 
 <style>
   .page-stats {

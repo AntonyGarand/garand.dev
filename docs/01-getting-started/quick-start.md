@@ -4,16 +4,28 @@ See real results in your first 5 minutes.
 
 ## Minutes 1-2: Personalize Your Info
 
-Open `.env` and update the following:
+Open `src/config.ts` and update the following:
 
-```bash
-SITE_AUTHOR_NAME="Your Full Name"
-SITE_AUTHOR_TITLE="Your Job Title"
-SITE_AUTHOR_EMAIL=you@example.com
-SITE_AUTHOR_BIO="A short bio about yourself (1-2 sentences)"
+```typescript
+export const siteConfig = {
+  // ... other config
+  author: {
+    name: "Your Full Name",
+    title: "Your Job Title",
+    email: "you@example.com",
+    bio: "A short bio about yourself (1-2 sentences)",
+    location: "Your City, Country",
+  },
 
-SOCIAL_GITHUB=https://github.com/your-username
-SOCIAL_LINKEDIN=https://linkedin.com/in/your-username
+  social: {
+    github: "https://github.com/your-username",
+    linkedin: "https://linkedin.com/in/your-username",
+    twitter: "",
+    mastodon: "",
+    bluesky: "",
+  },
+  // ...
+};
 ```
 
 Save the file and refresh your browser. The homepage now displays your name and info!
@@ -50,7 +62,6 @@ impact:
 learnings:
   - "What you learned from this project"
 ---
-
 Additional content about the project (optional).
 ```
 
@@ -78,6 +89,7 @@ rm -rf src/content/decisions/*   # If you don't want decision logs
 ```
 
 After removing, either:
+
 - Create at least 1 content file in each category you use
 - Or hide empty pages by editing navigation in `src/config.ts`
 

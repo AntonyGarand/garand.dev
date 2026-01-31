@@ -1,22 +1,22 @@
 ---
 /**
  * Footer Component
- * 
+ *
  * Site-wide footer displaying copyright information and social media links.
  * Automatically filters and displays only configured social links from site config.
  * Responsive layout that stacks vertically on mobile devices.
- * 
+ *
  * Social links are pulled from siteConfig.social and only displayed if they have
  * a URL value configured. Links open in new tabs with proper security attributes.
- * 
+ *
  * @component
- * 
+ *
  * @example
  * ```astro
  * <Footer />
  * ```
  */
-import { siteConfig } from '../config';
+import { siteConfig } from "../config";
 
 /**
  * Gets the current year for copyright display
@@ -25,36 +25,40 @@ const currentYear = new Date().getFullYear();
 
 /**
  * Filters and formats social links from site configuration
- * 
+ *
  * Only includes platforms that have a URL configured (non-empty values).
  * Capitalizes platform names for display (e.g., "github" becomes "Github").
- * 
+ *
  * @returns Array of social link objects with platform name and URL
  */
 const socialLinks = Object.entries(siteConfig.social)
   .filter(([_, url]) => url)
   .map(([platform, url]) => ({
     platform: platform.charAt(0).toUpperCase() + platform.slice(1),
-    url
+    url,
   }));
 ---
 
 <footer class="site-footer">
   <div class="footer-container">
     <span class="copyright">© {currentYear} {siteConfig.author.name}</span>
-    
-    {socialLinks.length > 0 && (
-      <div class="footer-social">
-        {socialLinks.map((link, index) => (
-          <>
-            <a href={link.url} target="_blank" rel="noopener noreferrer">
-              {link.platform}
-            </a>
-            {index < socialLinks.length - 1 && <span class="separator">·</span>}
-          </>
-        ))}
-      </div>
-    )}
+
+    {
+      socialLinks.length > 0 && (
+        <div class="footer-social">
+          {socialLinks.map((link, index) => (
+            <>
+              <a href={link.url} target="_blank" rel="noopener noreferrer">
+                {link.platform}
+              </a>
+              {index < socialLinks.length - 1 && (
+                <span class="separator">·</span>
+              )}
+            </>
+          ))}
+        </div>
+      )
+    }
   </div>
 </footer>
 
@@ -62,7 +66,11 @@ const socialLinks = Object.entries(siteConfig.social)
   .site-footer {
     border-top: 1px solid var(--color-border);
     padding: 2rem 1.5rem;
-    margin-top: auto;
+    background: rgba(21, 21, 21, 0.03);
+    backdrop-filter: blur(5px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.4);
+    margin-top: 16px;
   }
 
   .footer-container {

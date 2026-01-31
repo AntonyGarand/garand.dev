@@ -1,0 +1,78 @@
+
+---
+title: "Creating a new site background"
+description: "As I've migrated my website to using Astro, I wanted to display more creativity by using a dynamic background. Here's the process I went through to create a new unique background."
+publishDate: 2026-01-30
+updatedDate: 2026-01-30
+tags:
+  - portfolio
+type:
+ - note
+ - post
+draft: true
+---
+
+If you're reading this, thanks for looking into my content with so much depth!
+
+This is still a very rough draft of what I'd like to write about: I've been focusing on the actual implementation and will polish this article during the following days as I've been in a good development flow.
+
+# Creating a new site background
+
+I have always been inspired by the works of others within creative programming: Whenever a new creative website is shared on [hackernews](https://news.ycombinator.com/) or [lobste.rs](https://lobste.rs/), I find myself marveling at the ingenuity some engineers can display within their website.  
+
+With my role being impacted by recent layoffs from Amazon, I finally found myself with some time to review and update my website, providing me with an opportunity to have some fun with some of the web technologies I've wished to dabble with for a long time.
+
+While I love creative engineering, the most important criteria for my website is to be functional, so I had to keep the creative aspect to an optional background element, something that can give you some wow factor without impacting your time on the website should you want to ignore it.
+It would be fun to min-max my portfolio so it could be shared across the network at the expense of not being as accessible or harder to get the relevant information, but I'll leave my experiments into their own sections instead of on the whole site.
+
+
+# Idea gathering
+
+My first thoughts was to have a "doorway" to the website, such as opening curtains or an effect like the light at the end of a tunnel, but I quickly opted to not make one of these: While these can be a great showcase to enter the site, they're temporary by nature and can impact the primary use of the website, its access to information.
+
+Another thoughts I gave consideration to was using more 3d elements, such as [Bruno Simon's site](https://bruno-simon.com/) 
+
+http://blueshirt.com/
+
+https://messenger.abeto.co/
+
+With that said, I still wanted my site to have its own little fun twist, something discrete that would not tamper with the base navigation while showcasing my skills within web technologies: I figured a fun interactive background would be a good starting point.
+
+Now that I knew I wanted to make a background effect, time to find inspiration and give it my own twist.
+
+Looking at ThreeJS demos and reminiscing about [pointerpointer](https://pointerpointer.com/) as well as line-based backgrounds https://nextbricks.io/interactive-lines
+
+
+Finally, I had my idea: 
+Make a 3d point cloud of minimalist 2d pointers aiming towards the user pointer, a mix of line-based sighting and 3d geography while remaining simple enough to not distract visitors.
+
+# Implementation
+
+## Making a cursor
+As I was working with a 3d point cloud, I had the option of making a 3d cursor, such as a code on a cylinder, or keeping with a 2d cursor and shifting the 
+- Todo: Experiment with 3d and outline vs 2d
+
+## Making it follow my own cursor
+
+## Adding variance
+A bit of color, accounting for light mode and dark mode, varying speed to center back on the pointer, Bézier curve for the snapping maybe
+Different styles: 3d planes view, wireframe view, 2d item on 3d plane, 
+2d cursor: Aligning it with the background so it points to the correct angle.
+
+## Adding a trail / effect to the cursor
+
+
+## Making it work seamlessly across pages
+As this site is built using astro, the Canvas used by ThreeJS is scoped to the current page, and navigating to a different page would reset the background effect, making it distracting.
+
+Thankfully, astro thought of such use cases and provided us with ...
+
+# Keeping the content clear
+Reverse vignette so the center of the website remains clear of any obstructions and the text maintains a good contrast ratio.
+A simple way to achieve this is to use a vignette and darken the background within the main content body.
+
+Alternatively, I could use a card-based content wrapper which blurs the background, keeping the overall content crisp, a bit like liquid glass but blurry instead of fancy.
+
+
+
+https://threejsdemos.com/demos/basics/points-cloud

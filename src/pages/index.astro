@@ -76,13 +76,26 @@ const latestJourney = allJourneyEntries
 /**
  * Queries most recent writing entry for homepage card
  *
- * Retrieves all published writing entries (excluding drafts), sorts by
- * publish date (newest first), and takes the first entry for the homepage display.
+ * Retrieves all published writing posts (excluding drafts and notes-only items), sorts by
+ * publish date (newest first), and takes the first entry for homepage display.
  */
 const allWritingEntries = await getCollection("writing", ({ data }) => {
-  return data.draft === false;
+  return data.draft === false && data.type.includes('post');
 });
 const latestWriting = allWritingEntries
+  .sort((a, b) => b.data.publishDate.getTime() - a.data.publishDate.getTime())
+  .slice(0, 1)[0];
+
+/**
+ * Queries most recent notes entry for homepage card
+ *
+ * Retrieves all published notes (excluding drafts and posts-only items), sorts by
+ * publish date (newest first), and takes the first entry for homepage display.
+ */
+const allNotesEntries = await getCollection("writing", ({ data }) => {
+  return data.draft === false && data.type.includes('note');
+});
+const latestNote = allNotesEntries
   .sort((a, b) => b.data.publishDate.getTime() - a.data.publishDate.getTime())
   .slice(0, 1)[0];
 ---
@@ -163,7 +176,7 @@ const latestWriting = allWritingEntries
       <ForwardLink href="/journey" text="Read my journey" variant="muted" />
     </section>
 
-    <!-- Latest Journey & Writing -->
+    <!-- Latest Journey, Writing & Notes -->
     <section class="latest-content">
       <div class="section-header">
         <h2>Latest Updates</h2>
@@ -201,6 +214,18 @@ const latestWriting = allWritingEntries
               description={latestWriting.data.description}
               publishDate={latestWriting.data.publishDate}
               tags={latestWriting.data.tags}
+            />
+          )
+        }
+
+        {
+          latestNote && (
+            <ArticleCard
+              title={latestNote.data.title}
+              slug={latestNote.id}
+              description={latestNote.data.description}
+              publishDate={latestNote.data.publishDate}
+              tags={latestNote.data.tags}
             />
           )
         }
@@ -263,12 +288,11 @@ const latestWriting = allWritingEntries
     <section class="thinking">
       <h2>Problems I Enjoy Solving</h2>
       <p class="thinking-list">
-        Scaling systems without scaling complexity · Navigating trade-offs
-        between consistency and availability · Transforming legacy codebases
-        into maintainable assets · Architecting APIs built for longevity ·
-        Mentoring high-velocity engineering teams · Refactoring technical debt
-        into technical investment · Preserving institutional memory through
-        high quality documentation
+        Scaling systems without scaling complexity · Transforming legacy
+        codebases into maintainable assets · Architecting APIs built for
+        longevity · Mentoring high-velocity engineering teams · Finding creative
+        solutions to technical problems · Preserving institutional memory
+        through high quality documentation
       </p>
     </section>
 

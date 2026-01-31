@@ -1,23 +1,23 @@
 ---
 /**
- * Article Detail Page
- * 
- * Dynamic route that displays a full article with MDX content support, table of contents,
+ * Note Detail Page
+ *
+ * Dynamic route that displays a full note with MDX content support, table of contents,
  * metadata, and structured data for SEO. Provides an optimized reading experience with
  * clean typography and responsive design.
- * 
+ *
  * Features:
  * - MDX content rendering with full markdown support
  * - Automatic table of contents generation (when 3+ sections)
  * - Reading time calculation
- * - Article metadata (publish date, updated date, tags)
+ * - Note metadata (publish date, updated date, tags)
  * - Structured data for search engines
  * - Scroll-to-top functionality
- * - Back navigation to articles list
+ * - Back navigation to notes list
  * - Responsive typography
- * 
- * Route: /writing/[slug]
- * 
+ *
+ * Route: /notes/[slug]
+ *
  * @page
  */
 
@@ -31,42 +31,42 @@ import { getCollection, getEntry, render } from 'astro:content';
 import { getReadingTime } from '../../utils/readingTime';
 
 /**
- * Generates static paths for all published articles
- * 
- * Queries the writing collection and filters for published articles only
- * (draft: false), creating a route for each article using its ID as the slug.
- * 
+ * Generates static paths for all published notes
+ *
+ * Queries the writing collection and filters for published notes only
+ * (draft: false, type: 'note'), creating a route for each note using its ID as the slug.
+ *
  * @returns Array of path objects with params
  */
 export async function getStaticPaths() {
-  const articles = await getCollection('writing', ({ data }) => {
-    return data.draft === false && data.type.includes('post');
+  const notes = await getCollection('writing', ({ data }) => {
+    return data.draft === false && data.type.includes('note');
   });
-  return articles.map((article) => ({
-    params: { slug: article.id },
+  return notes.map((note) => ({
+    params: { slug: note.id },
   }));
 }
 
 const { slug } = Astro.params;
 
 /**
- * Retrieves the specific article entry by slug
- * 
- * Redirects to 404 if the article is not found.
+ * Retrieves the specific note entry by slug
+ *
+ * Redirects to 404 if the note is not found.
  */
-const article = await getEntry('writing', slug!);
+const note = await getEntry('writing', slug!);
 
-if (!article) {
+if (!note) {
   return Astro.redirect('/404');
 }
 
 /**
- * Renders the article content and extracts headings
- * 
+ * Renders the note content and extracts headings
+ *
  * The Content component renders the MDX, and headings are used for
  * the table of contents generation.
  */
-const { Content, headings } = await render(article);
+const { Content, headings } = await render(note);
 
 const {
   title,
@@ -74,21 +74,21 @@ const {
   publishDate,
   updatedDate,
   tags,
-} = article.data;
+} = note.data;
 
 /**
- * Calculates reading time from the article body
- * 
+ * Calculates reading time from the note body
+ *
  * Uses word count to estimate reading time in minutes.
  */
-const readingTime = getReadingTime(article.body || '');
+const readingTime = getReadingTime(note.body || '');
 
 /**
  * Formats a date object for display
- * 
+ *
  * Uses US English locale with full date format.
  * Example output: "January 15, 2024"
- * 
+ *
  * @param date - The date to format
  * @returns Formatted date string
  */
@@ -102,9 +102,9 @@ function formatDate(date: Date): string {
 ---
 
 <BaseLayout>
-  <SEO 
+  <SEO
     slot="head"
-    title={`${title} - Writing`}
+    title={`${title} - Notes`}
     description={description}
     type="article"
     publishDate={publishDate}
@@ -123,11 +123,11 @@ function formatDate(date: Date): string {
     }}
   />
 
-  <main class="article">
-    <!-- Article Header -->
-    <header class="article-header">
+  <main class="note">
+    <!-- Note Header -->
+    <header class="note-header">
       <h1>{title}</h1>
-      <div class="article-meta">
+      <div class="note-meta">
         <time class="publish-date" datetime={publishDate.toISOString()}>
           {formatDate(publishDate)}
         </time>
@@ -143,7 +143,7 @@ function formatDate(date: Date): string {
         )}
       </div>
       {tags && tags.length > 0 && (
-        <div class="article-tags">
+        <div class="note-tags">
           {tags.map((tag) => (
             <span class="tag">{tag}</span>
           ))}
@@ -154,30 +154,30 @@ function formatDate(date: Date): string {
     <!-- Table of Contents (conditionally rendered if 3+ sections) -->
     <TableOfContents headings={headings} />
 
-    <!-- Article Content -->
-    <article class="article-content">
+    <!-- Note Content -->
+    <article class="note-content">
       <Content />
     </article>
 
-    <BackLink href="/writing" text="All articles" />
+    <BackLink href="/notes" text="All notes" />
   </main>
 
   <ScrollToTop />
 
   <style>
-    .article {
+    .note {
       max-width: 800px;
       margin: 0 auto;
       padding: 2rem 1.5rem;
     }
 
-    .article-header {
+    .note-header {
       margin-bottom: 3rem;
       padding-bottom: 2rem;
       border-bottom: 1px solid var(--color-border);
     }
 
-    .article-header h1 {
+    .note-header h1 {
       font-size: 2.5rem;
       margin-bottom: 1rem;
       font-weight: 700;
@@ -185,7 +185,7 @@ function formatDate(date: Date): string {
       line-height: 1.2;
     }
 
-    .article-meta {
+    .note-meta {
       display: flex;
       align-items: center;
       gap: 0.75rem;
@@ -198,7 +198,7 @@ function formatDate(date: Date): string {
       opacity: 0.5;
     }
 
-    .article-tags {
+    .note-tags {
       display: flex;
       flex-wrap: wrap;
       gap: 0.5rem;
@@ -214,13 +214,13 @@ function formatDate(date: Date): string {
       color: var(--color-text-secondary);
     }
 
-    .article-content {
+    .note-content {
       font-size: 1.125rem;
       line-height: 1.7;
       color: var(--color-text);
     }
 
-    .article-content :global(h2) {
+    .note-content :global(h2) {
       font-size: 1.75rem;
       margin-top: 2.5rem;
       margin-bottom: 1rem;
@@ -230,7 +230,7 @@ function formatDate(date: Date): string {
       color: var(--color-text);
     }
 
-    .article-content :global(h3) {
+    .note-content :global(h3) {
       font-size: 1.375rem;
       margin-top: 2rem;
       margin-bottom: 0.75rem;
@@ -240,7 +240,7 @@ function formatDate(date: Date): string {
       color: var(--color-text);
     }
 
-    .article-content :global(h4) {
+    .note-content :global(h4) {
       font-size: 1.125rem;
       margin-top: 1.5rem;
       margin-bottom: 0.5rem;
@@ -249,24 +249,24 @@ function formatDate(date: Date): string {
       color: var(--color-text);
     }
 
-    .article-content :global(p) {
+    .note-content :global(p) {
       margin-bottom: 1.5rem;
       color: var(--color-text-secondary);
     }
 
-    .article-content :global(ul),
-    .article-content :global(ol) {
+    .note-content :global(ul),
+    .note-content :global(ol) {
       margin-bottom: 1.5rem;
       padding-left: 1.5rem;
       color: var(--color-text-secondary);
     }
 
-    .article-content :global(li) {
+    .note-content :global(li) {
       margin-bottom: 0.5rem;
       line-height: 1.7;
     }
 
-    .article-content :global(blockquote) {
+    .note-content :global(blockquote) {
       margin: 2rem 0;
       padding: 1rem 1.5rem;
       border-left: 4px solid var(--color-accent);
@@ -275,7 +275,7 @@ function formatDate(date: Date): string {
       color: var(--color-text-secondary);
     }
 
-    .article-content :global(code) {
+    .note-content :global(code) {
       font-family: ui-monospace, 'JetBrains Mono', 'Cascadia Code', Menlo, Consolas, 'Courier New', monospace;
       font-size: 0.9em;
       background: var(--color-bg-secondary);
@@ -284,7 +284,7 @@ function formatDate(date: Date): string {
       color: var(--color-text);
     }
 
-    .article-content :global(pre) {
+    .note-content :global(pre) {
       margin: 2rem 0;
       padding: 1.5rem;
       background: var(--color-bg-secondary);
@@ -293,66 +293,66 @@ function formatDate(date: Date): string {
       overflow-x: auto;
     }
 
-    .article-content :global(pre code) {
+    .note-content :global(pre code) {
       background: none;
       padding: 0;
       font-size: 0.9375rem;
       line-height: 1.6;
     }
 
-    .article-content :global(a) {
+    .note-content :global(a) {
       color: var(--color-accent);
       text-decoration: underline;
     }
 
-    .article-content :global(a:hover) {
+    .note-content :global(a:hover) {
       color: var(--color-accent-hover);
     }
 
-    .article-content :global(img) {
+    .note-content :global(img) {
       max-width: 100%;
       height: auto;
       border-radius: 8px;
       margin: 2rem 0;
     }
 
-    .article-content :global(hr) {
+    .note-content :global(hr) {
       margin: 3rem 0;
       border: none;
       border-top: 1px solid var(--color-border);
     }
 
-    .article-content :global(strong) {
+    .note-content :global(strong) {
       color: var(--color-text);
       font-weight: 600;
     }
 
     @media (max-width: 768px) {
-      .article {
+      .note {
         padding: 1.5rem 1rem;
       }
 
-      .article-header h1 {
+      .note-header h1 {
         font-size: 2rem;
       }
 
-      .article-content {
+      .note-content {
         font-size: 1rem;
       }
 
-      .article-content :global(h2) {
+      .note-content :global(h2) {
         font-size: 1.5rem;
       }
 
-      .article-content :global(h3) {
+      .note-content :global(h3) {
         font-size: 1.25rem;
       }
 
-      .article-content :global(h4) {
+      .note-content :global(h4) {
         font-size: 1.0625rem;
       }
 
-      .article-content :global(pre) {
+      .note-content :global(pre) {
         padding: 1rem;
       }
     }

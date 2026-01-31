@@ -1,0 +1,201 @@
+---
+/**
+ * Notes Index Page with Pagination
+ *
+ * Lists all published notes (excluding drafts) with pagination support. Displays
+ * note cards with title, description, publish date, and tags. Uses a rest parameter
+ * route to handle both the first page (/notes) and subsequent pages (/notes/2, etc.).
+ *
+ * Features:
+ * - Filters out draft notes (only shows published content)
+ * - Filters for type: 'note' (shows only notes, not posts)
+ * - Sorts by publish date (descending - newest first)
+ * - Pagination with 9 notes per page
+ * - Dynamic page statistics showing current range
+ * - SEO optimization per page
+ * - Empty state handling
+ *
+ * Routes:
+ * - /notes (page 1)
+ * - /notes/2 (page 2)
+ * - /notes/3 (page 3)
+ * - etc.
+ *
+ * @page
+ */
+
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import SEO from '../../components/SEO.astro';
+import Pagination from '../../components/Pagination.astro';
+import ArticleCard from '../../components/ArticleCard.astro';
+import PageStats from '../../components/PageStats.astro';
+import { getCollection } from 'astro:content';
+import { pagesConfig } from '../../pages.config';
+import type { GetStaticPaths } from 'astro';
+
+/**
+ * Generates static paths for all paginated pages
+ *
+ * Queries published notes (draft: false, type: 'note'), sorts by date, and creates
+ * pagination paths. Page 1 uses undefined param to match /notes route,
+ * while subsequent pages use numeric params (/notes/2, /notes/3, etc.).
+ *
+ * @returns Array of path objects with params and props for each page
+ */
+export const getStaticPaths: GetStaticPaths = async () => {
+  const notesPerPage = 9;
+
+  const allNotes = await getCollection('writing', ({ data }) => {
+    return data.draft === false && data.type.includes('note');
+  });
+
+  // Sort by publishDate (descending - most recent first)
+  const sortedNotes = allNotes.sort((a, b) => {
+    return b.data.publishDate.getTime() - a.data.publishDate.getTime();
+  });
+
+  const totalPages = Math.ceil(sortedNotes.length / notesPerPage);
+
+  return Array.from({ length: totalPages }, (_, i) => {
+    const page = i + 1;
+    const start = i * notesPerPage;
+    const end = start + notesPerPage;
+
+    return {
+      params: { page: page === 1 ? undefined : String(page) },
+      props: {
+        notes: sortedNotes.slice(start, end),
+        currentPage: page,
+        totalPages,
+        totalNotes: sortedNotes.length,
+      },
+    };
+  });
+};
+
+interface Props {
+  /** Notes for the current page */
+  notes: Awaited<ReturnType<typeof getCollection<'writing'>>>;
+
+  /** Current page number (1-indexed) */
+  currentPage: number;
+
+  /** Total number of pages */
+  totalPages: number;
+
+  /** Total count of all published notes */
+  totalNotes: number;
+}
+
+const { notes, currentPage, totalPages, totalNotes } = Astro.props;
+const notesPerPage = 9;
+
+/**
+ * Generates page title based on current page number
+ *
+ * Page 1 shows the main title, subsequent pages include page number.
+ */
+const pageTitle = currentPage === 1
+  ? pagesConfig.notes.title
+  : `${pagesConfig.notes.title} - Page ${currentPage}`;
+---
+
+<BaseLayout>
+  <SEO
+    slot="head"
+    title={pageTitle}
+    description={pagesConfig.notes.description}
+    type="website"
+  />
+
+  <main class="page-container">
+    <header class="page-header">
+      <h1 class="page-title">{pagesConfig.notes.heading}</h1>
+      <p class="page-intro">
+        {pagesConfig.notes.intro}
+      </p>
+      <PageStats text={totalPages > 1
+        ? `Showing ${(currentPage - 1) * notesPerPage + 1}–${Math.min(currentPage * notesPerPage, totalNotes)} of ${totalNotes} notes`
+        : `${totalNotes} notes`
+      } />
+    </header>
+
+    {notes.length > 0 ? (
+      <div class="card-list">
+        {notes.map((note) => (
+          <ArticleCard
+            title={note.data.title}
+            slug={note.id}
+            description={note.data.description}
+            publishDate={note.data.publishDate}
+            tags={note.data.tags}
+          />
+        ))}
+      </div>
+    ) : (
+      <p class="empty-state">No notes published yet.</p>
+    )}
+
+    <Pagination
+      currentPage={currentPage}
+      totalPages={totalPages}
+      baseUrl="/notes"
+    />
+  </main>
+</BaseLayout>
+
+<style>
+  .page-container {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 4rem 1.5rem;
+  }
+
+  .page-header {
+    margin-bottom: 3rem;
+  }
+
+  .page-title {
+    font-size: 2.5rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+    margin-bottom: 1rem;
+    color: var(--color-text);
+  }
+
+  .page-intro {
+    font-size: 1.125rem;
+    color: var(--color-text-secondary);
+    line-height: 1.6;
+    margin-bottom: 1.5rem;
+  }
+
+  .card-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    margin-bottom: 3rem;
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 4rem 2rem;
+    color: var(--color-text-secondary);
+    font-size: 1.125rem;
+  }
+
+  @media (max-width: 768px) {
+    .page-container {
+      padding: 3rem 1rem;
+    }
+
+    .page-title {
+      font-size: 2rem;
+    }
+
+    .page-intro {
+      font-size: 1rem;
+    }
+  }
+</style>

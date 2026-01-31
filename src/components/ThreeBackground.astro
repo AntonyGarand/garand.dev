@@ -1,0 +1,135 @@
+---
+/**
+ * ThreeBackground
+ *
+ * Three.js scene component for site-wide background rendering.
+ * Provides an interactive WebGL background that responds to theme changes.
+ *
+ * Features:
+ * - Fixed full-screen canvas
+ * - Theme-aware colors (dark/light mode)
+ * - Responsive resize handling
+ * - Performance optimized (pixel ratio limit)
+ * - Alpha transparency for CSS background integration
+ *
+ * Usage:
+ * ```astro
+ * <ThreeBackground />
+ * ```
+ *
+ * @component
+ */
+---
+
+<canvas id="three-bg"></canvas>
+
+<style>
+  #three-bg {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: -1;
+  }
+</style>
+
+<script>
+  import * as THREE from 'three';
+
+  const canvas = document.getElementById('three-bg') as HTMLCanvasElement;
+  const root = document.documentElement;
+
+  // Prevent multiple initializations during navigation
+  if (!(window as any).__threeBgInitialized) {
+    // Scene setup
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+    // Get theme colors from CSS variables
+    const getThemeColors = () => {
+      const computedStyle = getComputedStyle(root);
+      return {
+        background: computedStyle.getPropertyValue('--color-bg').trim(),
+        primary: computedStyle.getPropertyValue('--color-text').trim(),
+        secondary: computedStyle.getPropertyValue('--color-text-secondary').trim(),
+      };
+    };
+
+    // Create particles for the background
+    const particlesGeometry = new THREE.BufferGeometry();
+    const particlesCount = 2000;
+    const posArray = new Float32Array(particlesCount * 3);
+
+    for (let i = 0; i < particlesCount * 3; i++) {
+      posArray[i] = (Math.random() - 0.5) * 10;
+    }
+
+    particlesGeometry.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
+
+    const particlesMaterial = new THREE.PointsMaterial({
+      size: 0.02,
+      color: 0x888888,
+      transparent: true,
+      opacity: 0.8,
+    });
+
+    const particlesMesh = new THREE.Points(particlesGeometry, particlesMaterial);
+    scene.add(particlesMesh);
+
+    camera.position.z = 3;
+
+    // Theme change listener
+    const updateThemeColors = () => {
+      const colors = getThemeColors();
+      particlesMaterial.color.set(colors.secondary);
+    };
+
+    updateThemeColors();
+
+    // Listen for theme changes
+    const observer = new MutationObserver((mutations) => {
+      mutations.forEach((mutation) => {
+        if (mutation.attributeName === 'data-theme') {
+          updateThemeColors();
+        }
+      });
+    });
+
+    observer.observe(root, { attributes: true });
+
+    // Animation loop
+    let mouseX = 0;
+    let mouseY = 0;
+
+    document.addEventListener('mousemove', (event) => {
+      mouseX = (event.clientX / window.innerWidth) * 2 - 1;
+      mouseY = -(event.clientY / window.innerHeight) * 2 + 1;
+    });
+
+    function animate() {
+      requestAnimationFrame(animate);
+
+      // Subtle rotation based on mouse position
+      particlesMesh.rotation.x += 0.0001 + mouseY * 0.0001;
+      particlesMesh.rotation.y += 0.0001 + mouseX * 0.0001;
+
+      renderer.render(scene, camera);
+    }
+
+    animate();
+
+    // Resize handler
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    // Store references globally for persistence
+    (window as any).__threeBgInitialized = true;
+  }
+</script>
