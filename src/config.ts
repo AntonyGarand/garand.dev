@@ -61,7 +61,7 @@ export const siteConfig = {
     name: "Antony Garand",
 
     /** Professional title or role */
-    title: "Senior Software Engineer",
+    title: "Full-Stack Chaos Architect",
 
     /** Short biography or professional summary */
     bio: "Software thinkerer of all scales, from startups to Amazon!",

@@ -198,6 +198,7 @@ import "../styles/utilities.css";
             meshCount: 125,
             planeCount: 125,
             plainCount: 125,
+            coloredPercent: 0.25,
             saturationRange: { min: 0.1, max: 0.3 },
             lightnessRange: {
               dark: { min: 0.3, max: 0.5 },
@@ -345,11 +346,13 @@ import "../styles/utilities.css";
 
         function generateCursorColor(theme: Theme) {
           const hue = Math.random();
-          const saturation =
-            CONFIG.cursors.saturationRange.min +
-            Math.random() *
-              (CONFIG.cursors.saturationRange.max -
-                CONFIG.cursors.saturationRange.min);
+          const isColored = Math.random() < CONFIG.cursors.coloredPercent;
+          const saturation = isColored
+            ? CONFIG.cursors.saturationRange.min +
+              Math.random() *
+                (CONFIG.cursors.saturationRange.max -
+                  CONFIG.cursors.saturationRange.min)
+            : 0;
 
           const lightnessRange =
             theme === "dark"
@@ -534,7 +537,7 @@ import "../styles/utilities.css";
         }
 
         function initializeCursors() {
-          console.log(`Creating ${CONFIG.cursors.count} cursors...`);
+          // console.log(`Creating ${CONFIG.cursors.count} cursors...`);
           for (let i = 0; i < CONFIG.cursors.count; i++) {
             cursorsData.push(createCursor(i));
           }
@@ -612,7 +615,6 @@ import "../styles/utilities.css";
 
         window.addEventListener("scroll", updateScrollPosition);
         updateScrollPosition();
-
 
         /**
          * Applies wave displacement from mouse movement
