@@ -147,8 +147,6 @@ import "../styles/utilities.css";
       import * as THREE from "three";
 
       (function () {
-        console.log("Initializing Three.js background...");
-
         // Prevent re-initialization on SPA navigation
         if ((window as any).__threeBgRenderer) {
           console.log("Already initialized, skipping");
@@ -193,8 +191,6 @@ import "../styles/utilities.css";
           bottom: number;
         }
 
-        // ==================== Configuration ====================
-
         const CONFIG = {
           cursors: {
             count: 500,
@@ -203,10 +199,9 @@ import "../styles/utilities.css";
             planeCount: 125,
             plainCount: 125,
             saturationRange: { min: 0.1, max: 0.3 },
-            // Adjusted lightness ranges for better theme contrast
             lightnessRange: {
-              dark: { min: 0.3, max: 0.5 }, // Darker on dark theme (more discreet)
-              light: { min: 0.15, max: 0.35 }, // Much darker on light theme (more visible)
+              dark: { min: 0.3, max: 0.5 },
+              light: { min: 0.15, max: 0.35 },
             },
             spawnBounds: {
               x: 14,
@@ -233,8 +228,6 @@ import "../styles/utilities.css";
           },
         };
 
-        // ==================== Scene Setup ====================
-
         const scene = new THREE.Scene();
         const camera = new THREE.PerspectiveCamera(
           75,
@@ -252,11 +245,9 @@ import "../styles/utilities.css";
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
         camera.position.z = 5;
 
-        // ==================== Geometry Creation ====================
-
         /**
-         * Creates a 3D arrow cursor geometry with depth
-         * Arrow points upward (+Y direction)
+         * Creates a 3D cursor geometry
+         * Arrow points upward by default (+Y direction)
          */
         function create3DArrowGeometry() {
           const shape = new THREE.Shape();
@@ -289,9 +280,6 @@ import "../styles/utilities.css";
           return geometry;
         }
 
-        /**
-         * Creates a 2D arrow outline geometry (lines only, no fill)
-         */
         function create2DArrowOutlineGeometry() {
           const points = [];
 
@@ -315,11 +303,6 @@ import "../styles/utilities.css";
         const arrow3DGeometry = create3DArrowGeometry();
         const arrow2DOutlineGeometry = create2DArrowOutlineGeometry();
 
-        // ==================== Material Creation ====================
-
-        /**
-         * Creates outline-only material (edges of 3D geometry)
-         */
         function createOutlineMaterial(color: THREE.Color) {
           return new THREE.LineBasicMaterial({
             color,
@@ -328,9 +311,6 @@ import "../styles/utilities.css";
           });
         }
 
-        /**
-         * Creates wireframe material (all edges visible)
-         */
         function createWireframeMaterial(color: THREE.Color) {
           return new THREE.MeshBasicMaterial({
             color,
@@ -340,9 +320,6 @@ import "../styles/utilities.css";
           });
         }
 
-        /**
-         * Creates ghostly transparent material for 3D faces
-         */
         function createPlaneMaterial(color: THREE.Color) {
           return new THREE.MeshBasicMaterial({
             color,
@@ -352,9 +329,6 @@ import "../styles/utilities.css";
           });
         }
 
-        /**
-         * Creates 2D line material for plain cursor
-         */
         function createPlainMaterial(color: THREE.Color) {
           return new THREE.LineBasicMaterial({
             color,
@@ -364,19 +338,11 @@ import "../styles/utilities.css";
           });
         }
 
-        // ==================== Color Management ====================
-
-        /**
-         * Gets the current theme from document attribute
-         */
         function getCurrentTheme(): Theme {
           const theme = document.documentElement.getAttribute("data-theme");
           return (theme === "light" ? "light" : "dark") as Theme;
         }
 
-        /**
-         * Generates a color with subtle variation
-         */
         function generateCursorColor(theme: Theme) {
           const hue = Math.random();
           const saturation =
@@ -385,7 +351,6 @@ import "../styles/utilities.css";
               (CONFIG.cursors.saturationRange.max -
                 CONFIG.cursors.saturationRange.min);
 
-          // Use theme-specific lightness range
           const lightnessRange =
             theme === "dark"
               ? CONFIG.cursors.lightnessRange.dark
@@ -404,17 +369,12 @@ import "../styles/utilities.css";
           return { hue, saturation, baseLightness, color };
         }
 
-        /**
-         * Updates color based on theme
-         */
         function updateColorForTheme(
           hue: number,
           saturation: number,
           baseLightness: number,
           theme: Theme,
         ) {
-          // Recalculate lightness based on theme
-          // We need to map the old lightness to the new theme's range
           const oldRange =
             theme === "dark"
               ? CONFIG.cursors.lightnessRange.light
@@ -424,18 +384,13 @@ import "../styles/utilities.css";
               ? CONFIG.cursors.lightnessRange.dark
               : CONFIG.cursors.lightnessRange.light;
 
-          // Normalize position in old range (0-1)
           const position =
             (baseLightness - oldRange.min) / (oldRange.max - oldRange.min);
-
-          // Map to new range
           const newLightness =
             newRange.min + position * (newRange.max - newRange.min);
 
           return new THREE.Color().setHSL(hue, saturation, newLightness);
         }
-
-        // ==================== Cursor Creation ====================
 
         /**
          * Creates a cursor mesh based on type
@@ -473,9 +428,6 @@ import "../styles/utilities.css";
           }
         }
 
-        /**
-         * Determines cursor type based on index
-         */
         function getCursorType(index: number): CursorType {
           if (index < CONFIG.cursors.outlineCount) return "outline";
           if (index < CONFIG.cursors.outlineCount + CONFIG.cursors.meshCount)
@@ -490,10 +442,6 @@ import "../styles/utilities.css";
           return "plain";
         }
 
-        /**
-         * Calculates parallax speed based on Z depth
-         * Nearer cursors (higher z) move faster
-         */
         function getParallaxSpeed(z: number) {
           const zRange =
             CONFIG.cursors.spawnBounds.z.max - CONFIG.cursors.spawnBounds.z.min;
@@ -504,13 +452,8 @@ import "../styles/utilities.css";
           );
         }
 
-        // ==================== Cursor Initialization ====================
-
         const cursorsData: CursorData[] = [];
 
-        /**
-         * Creates a single cursor with random properties
-         */
         function createCursor(index: number): CursorData {
           const theme = getCurrentTheme();
           const { hue, saturation, baseLightness, color } =
@@ -590,9 +533,6 @@ import "../styles/utilities.css";
           }
         }
 
-        /**
-         * Initialize all cursors
-         */
         function initializeCursors() {
           console.log(`Creating ${CONFIG.cursors.count} cursors...`);
           for (let i = 0; i < CONFIG.cursors.count; i++) {
@@ -602,14 +542,9 @@ import "../styles/utilities.css";
 
         initializeCursors();
 
-        // ==================== Theme Management ====================
-
-        /**
-         * Updates all cursor colors when theme changes
-         */
         function updateThemeColors() {
           const theme = getCurrentTheme();
-          console.log(`Theme changed to ${theme}, updating colors...`);
+          // console.log(`Theme changed to ${theme}, updating colors...`);
 
           cursorsData.forEach((cursor) => {
             const newColor = updateColorForTheme(
@@ -638,8 +573,6 @@ import "../styles/utilities.css";
 
         observer.observe(document.documentElement, { attributes: true });
 
-        // ==================== Input Tracking ====================
-
         let mouseX = 0;
         let mouseY = 0;
         let prevMouseX = 0;
@@ -649,9 +582,6 @@ import "../styles/utilities.css";
         let prevScrollY = 0;
         let scrollVelocity = 0;
 
-        /**
-         * Updates mouse position in normalized coordinates
-         */
         function updateMousePosition(clientX: number, clientY: number) {
           prevMouseX = mouseX;
           prevMouseY = mouseY;
@@ -663,9 +593,6 @@ import "../styles/utilities.css";
           mouseVelocity = Math.sqrt(dx * dx + dy * dy);
         }
 
-        /**
-         * Updates scroll position and velocity
-         */
         function updateScrollPosition() {
           prevScrollY = scrollY;
           scrollY = window.scrollY || window.pageYOffset;
@@ -686,21 +613,27 @@ import "../styles/utilities.css";
         window.addEventListener("scroll", updateScrollPosition);
         updateScrollPosition();
 
-        // ==================== Interaction Effects ====================
 
         /**
          * Applies wave displacement from mouse movement
+         * Accounts for parallax offset to calculate distance from rendered position
          */
         function applyMouseWave(
           targetX: number,
           targetY: number,
           mouseVel: number,
+          currentScrollY: number,
         ) {
           if (mouseVel < 0.001) return;
 
           cursorsData.forEach((cursor) => {
+            // Calculate where cursor is actually rendered after parallax
+            const parallaxOffset = currentScrollY * cursor.parallaxSpeed;
+            const renderedY = cursor.position.y + parallaxOffset;
+
+            // Calculate distance from mouse to rendered position
             const dx = targetX - cursor.position.x;
-            const dy = targetY - cursor.position.y;
+            const dy = targetY - renderedY;
             const distance = Math.sqrt(dx * dx + dy * dy);
 
             if (distance < CONFIG.interaction.waveRadius) {
@@ -731,14 +664,11 @@ import "../styles/utilities.css";
           });
         }
 
-        // ==================== Animation Loop ====================
+        // Animation Loop
 
-        let lastFrameTime = performance.now();
         const startTime = performance.now();
+        let lastFrameTime = startTime;
 
-        /**
-         * Main animation loop
-         */
         function animate() {
           requestAnimationFrame(animate);
 
@@ -760,17 +690,14 @@ import "../styles/utilities.css";
             bottom: -height / 2 - 1,
           };
 
-          // Mouse position in world space (viewport coordinates)
           const targetX = mouseX * (width / 2);
           const targetY = mouseY * (height / 2);
           const targetZ = 0;
 
-          // Apply effects using un-offset positions
-          applyMouseWave(targetX, targetY, mouseVelocity);
+          applyMouseWave(targetX, targetY, mouseVelocity, scrollY);
           applyScrollWave(scrollVelocity);
 
           cursorsData.forEach((cursor) => {
-            // Organic sine wave drift
             cursor.position.x +=
               cursor.velocity.x +
               Math.sin(elapsed * 0.5 + cursor.phase) * 0.003;
@@ -843,9 +770,8 @@ import "../styles/utilities.css";
             );
 
             // Calculate rotation direction accounting for parallax offset
-            // The cursor is rendered at finalY, so calculate direction from there
             const rotationDx = targetX - cursor.position.x;
-            const rotationDy = targetY - finalY; // Use finalY to account for parallax
+            const rotationDy = targetY - finalY;
             const rotationDz = targetZ - cursor.position.z;
 
             const direction = new THREE.Vector3(
@@ -877,22 +803,18 @@ import "../styles/utilities.css";
 
         animate();
 
-        // ==================== Window Resize ====================
-
         window.addEventListener("resize", () => {
           camera.aspect = window.innerWidth / window.innerHeight;
           camera.updateProjectionMatrix();
           renderer.setSize(window.innerWidth, window.innerHeight);
         });
 
-        // ==================== Store References ====================
-
         (window as any).__threeBgScene = scene;
         (window as any).__threeBgCamera = camera;
         (window as any).__threeBgRenderer = renderer;
         (window as any).__threeBgCursors = cursorsData;
 
-        console.log("Three.js background initialized successfully");
+        // console.log("Three.js background initialized successfully");
       })();
     </script>
   </body>
