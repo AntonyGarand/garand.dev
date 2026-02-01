@@ -69,6 +69,16 @@ export const pagesConfig = {
 	},
 
 	/**
+	 * Retro Sketcher interactive page (/retro-sketcher)
+	 */
+	"retro-sketcher": {
+		title: "Retro Sketcher - Interactive Drawing",
+		description: "A digital retro drawing toy that you can control with your keyboard or mouse.",
+		heading: "Retro Sketcher",
+		intro: "Use the arrow keys or the knobs to draw. Shake to clear!",
+	},
+
+	/**
 	 * Decisions listing page (/decisions)
 	 */
 	decisions: {

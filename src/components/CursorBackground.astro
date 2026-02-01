@@ -15,16 +15,125 @@
  *
  * Usage:
  * ```astro
- * <CursorBackground />
+ * <CursorBackground
+ *   cursors={{ count: 200, outlineCount: 50 }}
+ *   animation={{ driftSpeed: 0.001, attractionForce: 0.0001 }}
+ *   interaction={{ waveStrength: 0.2 }}
+ *   parallax={{ minSpeed: 0.0005 }}
+ * />
  * ```
+ *
+ * @param cursors - Cursor count and appearance settings
+ * @param animation - Animation speed and force settings
+ * @param interaction - Mouse interaction wave settings
+ * @param parallax - Parallax effect and scroll wave settings
  *
  * @component
  */
 
-// No frontmatter needed - self-contained component
+interface CursorBounds {
+  x: number;
+  y: number;
+  z: { min: number; max: number };
+}
+
+interface CursorSettings {
+  count?: number;
+  outlineCount?: number;
+  meshCount?: number;
+  planeCount?: number;
+  plainCount?: number;
+  coloredPercent?: number;
+  saturationRange?: { min: number; max: number };
+  lightnessRange?: {
+    dark: { min: number; max: number };
+    light: { min: number; max: number };
+  };
+  spawnBounds?: CursorBounds;
+}
+
+interface AnimationSettings {
+  driftSpeed?: number;
+  attractionForce?: number;
+  homeForce?: number;
+  rotationSpeedRange?: { min: number; max: number };
+}
+
+interface InteractionSettings {
+  waveStrength?: number;
+  waveRadius?: number;
+  waveDecay?: number;
+}
+
+interface ParallaxSettings {
+  minSpeed?: number;
+  maxSpeed?: number;
+  scrollWaveStrength?: number;
+  scrollWaveDecay?: number;
+}
+
+interface CursorBackgroundProps {
+  cursors?: Partial<CursorSettings>;
+  animation?: Partial<AnimationSettings>;
+  interaction?: Partial<InteractionSettings>;
+  parallax?: Partial<ParallaxSettings>;
+}
+
+const DEFAULT_CONFIG = {
+  cursors: {
+    count: 500,
+    outlineCount: 125,
+    meshCount: 125,
+    planeCount: 125,
+    plainCount: 125,
+    coloredPercent: 0.25,
+    saturationRange: { min: 0.1, max: 0.3 },
+    lightnessRange: {
+      dark: { min: 0.3, max: 0.5 },
+      light: { min: 0.15, max: 0.35 },
+    },
+    spawnBounds: {
+      x: 14,
+      y: 10,
+      z: { min: -4, max: 4 },
+    },
+  },
+  animation: {
+    driftSpeed: 0.003,
+    attractionForce: 0.0002,
+    homeForce: 0.0008,
+    rotationSpeedRange: { min: 0.1, max: 1.0 },
+  },
+  interaction: {
+    waveStrength: 0.15,
+    waveRadius: 3.0,
+    waveDecay: 0.92,
+  },
+  parallax: {
+    minSpeed: 0.001,
+    maxSpeed: 0.002,
+    scrollWaveStrength: 0.02,
+    scrollWaveDecay: 0.95,
+  },
+};
+
+const { cursors = {}, animation = {}, interaction = {}, parallax = {} }: CursorBackgroundProps = Astro.props;
+
+const config = {
+  cursors: { ...DEFAULT_CONFIG.cursors, ...cursors },
+  animation: { ...DEFAULT_CONFIG.animation, ...animation },
+  interaction: { ...DEFAULT_CONFIG.interaction, ...interaction },
+  parallax: { ...DEFAULT_CONFIG.parallax, ...parallax },
+};
+
+const configJson = encodeURIComponent(JSON.stringify(config));
 ---
 
-<canvas id="three-bg" transition:persist></canvas>
+<canvas
+  id="three-bg"
+  transition:persist
+  data-config={configJson}
+></canvas>
 <div class="static-background"></div>
 <div class="vignette"></div>
 
@@ -114,7 +223,8 @@
       bottom: number;
     }
 
-    const CONFIG = {
+    // Default configuration
+    const DEFAULT_CONFIG = {
       cursors: {
         count: 500,
         outlineCount: 125,
@@ -150,6 +260,18 @@
         scrollWaveStrength: 0.02,
         scrollWaveDecay: 0.95,
       },
+    };
+
+    // Load configuration from data attribute and merge with defaults
+    const configData = canvas.dataset.config
+      ? JSON.parse(decodeURIComponent(canvas.dataset.config))
+      : {};
+
+    const CONFIG = {
+      cursors: { ...DEFAULT_CONFIG.cursors, ...configData.cursors },
+      animation: { ...DEFAULT_CONFIG.animation, ...configData.animation },
+      interaction: { ...DEFAULT_CONFIG.interaction, ...configData.interaction },
+      parallax: { ...DEFAULT_CONFIG.parallax, ...configData.parallax },
     };
 
     const scene = new THREE.Scene();

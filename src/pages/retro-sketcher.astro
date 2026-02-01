@@ -1,0 +1,582 @@
+---
+/**
+ * Retro Sketcher Page
+ *
+ * Interactive digital retro drawing toy with keyboard and mouse controls.
+ * Users can draw by using arrow keys or rotating the knobs with mouse/touch.
+ *
+ * Features:
+ * - Canvas-based drawing with aluminum powder effect
+ * - Dual knob controls (horizontal/vertical)
+ * - Keyboard arrow key support
+ * - Shake-to-clear with animation
+ * - Responsive design
+ * - Classic red frame styling
+ *
+ * Route: /retro-sketcher
+ *
+ * @page
+ */
+
+import BaseLayout from '../layouts/BaseLayout.astro';
+import SEO from '../components/SEO.astro';
+import { pagesConfig } from '../pages.config';
+---
+
+<BaseLayout>
+  <SEO
+    slot="head"
+    title={pagesConfig['retro-sketcher'].title}
+    description={pagesConfig['retro-sketcher'].description}
+    type="website"
+  />
+
+  <main class="page-container">
+    <header class="page-header">
+      <h1 class="page-title">{pagesConfig['retro-sketcher'].heading}</h1>
+      <p class="page-intro">
+        {pagesConfig['retro-sketcher'].intro}
+      </p>
+    </header>
+
+    <div class="etch-container" id="etchContainer">
+      <div class="etch-frame">
+        <div class="etch-screen">
+          <canvas id="etchCanvas"></canvas>
+        </div>
+
+        <div class="etch-controls">
+          <div class="knob-container">
+            <button
+              class="knob"
+              id="knobY"
+              aria-label="Vertical control knob"
+            >
+              <div class="knob-inner"></div>
+            </button>
+            <span class="knob-label">Vertical</span>
+          </div>
+
+          <button
+            class="shake-button"
+            id="shakeButton"
+            aria-label="Shake to clear drawing"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M2 12l3-3m0 0l3 3m-3-3v9m14-6l-3 3m0 0l-3-3m3 3V3"/>
+            </svg>
+            Shake
+          </button>
+
+          <div class="knob-container">
+            <button
+              class="knob"
+              id="knobX"
+              aria-label="Horizontal control knob"
+            >
+              <div class="knob-inner"></div>
+            </button>
+            <span class="knob-label">Horizontal</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="etch-instructions">
+        <h3>Controls</h3>
+        <ul>
+          <li><kbd>↑</kbd> <kbd>↓</kbd> <kbd>←</kbd> <kbd>→</kbd> Arrow keys to draw (hold multiple for diagonals)</li>
+          <li>Click anywhere on the canvas to draw a line to that position</li>
+          <li>Click and drag the knobs to rotate</li>
+          <li><button class="shake-button-small">Shake</button> to clear the drawing</li>
+        </ul>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    class RetroSketcher {
+      private canvas: HTMLCanvasElement;
+      private ctx: CanvasRenderingContext2D;
+      private knobX: HTMLElement;
+      private knobY: HTMLElement;
+      private shakeButton: HTMLElement;
+      private container: HTMLElement;
+
+      private x: number = 0;
+      private y: number = 0;
+      private angleX: number = 0;
+      private angleY: number = 0;
+      private speed: number = 4;
+      private canvasWidth: number = 0;
+      private canvasHeight: number = 0;
+
+      private keys: Record<string, boolean> = {};
+      private animationId: number = 0;
+
+      constructor() {
+        this.canvas = document.getElementById('etchCanvas') as HTMLCanvasElement;
+        this.ctx = this.canvas.getContext('2d')!;
+        this.knobX = document.getElementById('knobX')!;
+        this.knobY = document.getElementById('knobY')!;
+        this.shakeButton = document.getElementById('shakeButton')!;
+        this.container = document.getElementById('etchContainer')!;
+
+        this.init();
+      }
+
+      private init(): void {
+        this.resizeCanvas();
+        this.centerCursor();
+        this.clearCanvas();
+        this.bindEvents();
+        this.updateKnobVisuals();
+      }
+
+      private resizeCanvas(): void {
+        const containerWidth = this.canvas.parentElement!.clientWidth;
+        this.canvasWidth = containerWidth;
+        this.canvasHeight = Math.min(containerWidth * 0.75, 500);
+        this.canvas.width = this.canvasWidth;
+        this.canvas.height = this.canvasHeight;
+      }
+
+      private centerCursor(): void {
+        this.x = this.canvasWidth / 2;
+        this.y = this.canvasHeight / 2;
+      }
+
+      private clearCanvas(): void {
+        this.ctx.fillStyle = '#d4c4a8';
+        this.ctx.fillRect(0, 0, this.canvasWidth, this.canvasHeight);
+
+        this.ctx.strokeStyle = '#1a1a1a';
+        this.ctx.lineWidth = 2;
+        this.ctx.lineCap = 'round';
+        this.ctx.lineJoin = 'round';
+      }
+
+      private draw(dx: number, dy: number): void {
+        const newX = Math.max(0, Math.min(this.canvasWidth, this.x + dx));
+        const newY = Math.max(0, Math.min(this.canvasHeight, this.y + dy));
+
+        this.ctx.beginPath();
+        this.ctx.moveTo(this.x, this.y);
+        this.ctx.lineTo(newX, newY);
+        this.ctx.stroke();
+
+        this.x = newX;
+        this.y = newY;
+      }
+
+      private drawTo(targetX: number, targetY: number): void {
+        this.ctx.beginPath();
+        this.ctx.moveTo(this.x, this.y);
+        this.ctx.lineTo(targetX, targetY);
+        this.ctx.stroke();
+
+        this.x = targetX;
+        this.y = targetY;
+      }
+
+      private handleCanvasClick = (e: MouseEvent): void => {
+        const rect = this.canvas.getBoundingClientRect();
+        const scaleX = this.canvas.width / rect.width;
+        const scaleY = this.canvas.height / rect.height;
+
+        const clickX = (e.clientX - rect.left) * scaleX;
+        const clickY = (e.clientY - rect.top) * scaleY;
+
+        this.drawTo(clickX, clickY);
+      };
+
+      private updateFromKeys(): void {
+        let dx = 0;
+        let dy = 0;
+
+        if (this.keys['ArrowUp']) dy -= this.speed;
+        if (this.keys['ArrowDown']) dy += this.speed;
+        if (this.keys['ArrowLeft']) dx -= this.speed;
+        if (this.keys['ArrowRight']) dx += this.speed;
+
+        if (dx !== 0 || dy !== 0) {
+          this.draw(dx, dy);
+
+          const rotationSpeed = 5;
+          if (dx !== 0) {
+            this.angleX += dx > 0 ? rotationSpeed : -rotationSpeed;
+          }
+          if (dy !== 0) {
+            this.angleY += dy > 0 ? rotationSpeed : -rotationSpeed;
+          }
+
+          this.updateKnobVisuals();
+        }
+
+        this.animationId = requestAnimationFrame(() => this.updateFromKeys());
+      }
+
+      private handleKeydown = (e: KeyboardEvent): void => {
+        if (this.keys[e.key]) return;
+
+        this.keys[e.key] = true;
+
+        if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+          e.preventDefault();
+          if (this.animationId === 0) {
+            this.updateFromKeys();
+          }
+        }
+      };
+
+      private handleKeyup = (e: KeyboardEvent): void => {
+        delete this.keys[e.key];
+
+        const hasKeys = Object.keys(this.keys).some(k =>
+          ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(k)
+        );
+
+        if (!hasKeys && this.animationId !== 0) {
+          cancelAnimationFrame(this.animationId);
+          this.animationId = 0;
+        }
+      };
+
+      private handleKnobDrag = (knob: HTMLElement, isHorizontal: boolean, startEvent: MouseEvent | TouchEvent): void => {
+        const rect = knob.getBoundingClientRect();
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height / 2;
+
+        const clientX = 'touches' in startEvent ? startEvent.touches[0].clientX : startEvent.clientX;
+        const clientY = 'touches' in startEvent ? startEvent.touches[0].clientY : startEvent.clientY;
+
+        const initialCursorAngle = Math.atan2(clientY - centerY, clientX - centerX) * (180 / Math.PI);
+
+        let lastCursorAngle = initialCursorAngle;
+        let totalDelta = 0;
+
+        const updateAngle = (cx: number, cy: number) => {
+          const currentCursorAngle = Math.atan2(cy - centerY, cx - centerX) * (180 / Math.PI);
+
+          let delta = currentCursorAngle - lastCursorAngle;
+
+          while (delta > 180) delta -= 360;
+          while (delta < -180) delta += 360;
+
+          totalDelta += delta;
+
+          if (Math.abs(delta) > 0.1) {
+            if (isHorizontal) {
+              this.angleX += delta;
+              const dx = delta * 0.1;
+              this.draw(dx, 0);
+            } else {
+              this.angleY += delta;
+              const dy = delta * 0.1;
+              this.draw(0, dy);
+            }
+          }
+
+          this.updateKnobVisuals();
+          lastCursorAngle = currentCursorAngle;
+        };
+
+        const handleMove = (e: MouseEvent | TouchEvent) => {
+          const cx = 'touches' in e ? e.touches[0].clientX : e.clientX;
+          const cy = 'touches' in e ? e.touches[0].clientY : e.clientY;
+          updateAngle(cx, cy);
+        };
+
+        const handleEnd = () => {
+          document.removeEventListener('mousemove', handleMove);
+          document.removeEventListener('mouseup', handleEnd);
+          document.removeEventListener('touchmove', handleMove);
+          document.removeEventListener('touchend', handleEnd);
+        };
+
+        document.addEventListener('mousemove', handleMove);
+        document.addEventListener('mouseup', handleEnd);
+        document.addEventListener('touchmove', handleMove, { passive: false });
+        document.addEventListener('touchend', handleEnd);
+      };
+
+      private handleShake = (): void => {
+        this.container.classList.add('shaking');
+        setTimeout(() => {
+          this.container.classList.remove('shaking');
+        }, 500);
+
+        setTimeout(() => {
+          this.clearCanvas();
+          this.updateKnobVisuals();
+        }, 250);
+      };
+
+      private updateKnobVisuals(): void {
+        this.knobX.style.transform = `rotate(${this.angleX}deg)`;
+        this.knobY.style.transform = `rotate(${this.angleY}deg)`;
+      }
+
+      private bindEvents(): void {
+        document.addEventListener('keydown', this.handleKeydown);
+        document.addEventListener('keyup', this.handleKeyup);
+
+        this.knobX.addEventListener('mousedown', (e) => {
+          this.handleKnobDrag(this.knobX, true, e);
+          e.preventDefault();
+        });
+
+        this.knobX.addEventListener('touchstart', (e) => {
+          this.handleKnobDrag(this.knobX, true, e);
+          e.preventDefault();
+        }, { passive: false });
+
+        this.knobY.addEventListener('mousedown', (e) => {
+          this.handleKnobDrag(this.knobY, false, e);
+          e.preventDefault();
+        });
+
+        this.knobY.addEventListener('touchstart', (e) => {
+          this.handleKnobDrag(this.knobY, false, e);
+          e.preventDefault();
+        }, { passive: false });
+
+        this.shakeButton.addEventListener('click', this.handleShake);
+
+        this.canvas.addEventListener('click', this.handleCanvasClick);
+
+        window.addEventListener('resize', () => {
+          const oldX = this.x / this.canvasWidth;
+          const oldY = this.y / this.canvasHeight;
+          this.resizeCanvas();
+          this.x = oldX * this.canvasWidth;
+          this.y = oldY * this.canvasHeight;
+        });
+      }
+    }
+
+    document.addEventListener('astro:page-load', () => {
+      new RetroSketcher();
+    });
+  </script>
+
+  <style>
+    .etch-container {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 2rem 1rem;
+    }
+
+    .etch-frame {
+      background: linear-gradient(135deg, #cc2a2a 0%, #a82020 100%);
+      border-radius: 1.5rem;
+      padding: 1.5rem;
+      box-shadow:
+        0 10px 40px rgba(0, 0, 0, 0.3),
+        inset 0 1px 0 rgba(255, 255, 255, 0.2);
+      position: relative;
+    }
+
+    .etch-frame::before {
+      content: '';
+      position: absolute;
+      top: 0.5rem;
+      left: 0.5rem;
+      right: 0.5rem;
+      bottom: 0.5rem;
+      border: 2px solid rgba(255, 255, 255, 0.1);
+      border-radius: 1rem;
+      pointer-events: none;
+    }
+
+    .etch-screen {
+      background: #1a1a1a;
+      border-radius: 0.75rem;
+      padding: 0.5rem;
+      box-shadow: inset 0 4px 12px rgba(0, 0, 0, 0.5);
+      margin-bottom: 1.5rem;
+    }
+
+    #etchCanvas {
+      display: block;
+      width: 100%;
+      border-radius: 0.5rem;
+      cursor: crosshair;
+    }
+
+    .etch-controls {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      padding: 0 1rem;
+    }
+
+    .knob-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .knob {
+      width: 5rem;
+      height: 5rem;
+      background: linear-gradient(145deg, #e8e8e8 0%, #c8c8c8 100%);
+      border-radius: 50%;
+      border: none;
+      cursor: grab;
+      box-shadow:
+        0 4px 8px rgba(0, 0, 0, 0.2),
+        inset 0 2px 4px rgba(255, 255, 255, 0.5);
+      position: relative;
+      transition: transform 0.1s ease;
+      touch-action: none;
+    }
+
+    .knob:active {
+      cursor: grabbing;
+      transform: scale(0.95);
+    }
+
+    .knob-inner {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 0.5rem;
+      height: 50%;
+      background: #1a1a1a;
+      transform: translate(-50%, -100%);
+      border-radius: 0.25rem;
+    }
+
+    .knob-label {
+      font-size: 0.875rem;
+      color: rgba(255, 255, 255, 0.8);
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .shake-button {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: linear-gradient(145deg, #ffffff 0%, #e0e0e0 100%);
+      border: none;
+      border-radius: 0.5rem;
+      padding: 0.75rem 1.5rem;
+      color: #1a1a1a;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+      transition: all 0.2s ease;
+    }
+
+    .shake-button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 12px rgba(0, 0, 0, 0.25);
+    }
+
+    .shake-button:active {
+      transform: translateY(0);
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    }
+
+    .shake-button svg {
+      width: 1.25rem;
+      height: 1.25rem;
+    }
+
+    .etch-instructions {
+      margin-top: 2rem;
+      padding: 1.5rem;
+      background: var(--color-surface);
+      border-radius: 0.75rem;
+      border: 1px solid var(--color-border);
+    }
+
+    .etch-instructions h3 {
+      margin-top: 0;
+      margin-bottom: 1rem;
+      font-size: 1.25rem;
+      color: var(--color-text);
+    }
+
+    .etch-instructions ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    .etch-instructions li {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      color: var(--color-text-secondary);
+      font-size: 1rem;
+    }
+
+    .etch-instructions kbd {
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: 0.25rem;
+      padding: 0.25rem 0.5rem;
+      font-family: monospace;
+      font-size: 0.875rem;
+      min-width: 1.5rem;
+      text-align: center;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+    }
+
+    .shake-button-small {
+      background: var(--color-accent);
+      border: none;
+      border-radius: 0.25rem;
+      padding: 0.25rem 0.5rem;
+      color: var(--color-text);
+      font-size: 0.875rem;
+      cursor: pointer;
+      font-family: inherit;
+    }
+
+    @keyframes shake {
+      0%, 100% {
+        transform: translateX(0) rotate(0);
+      }
+      10%, 30%, 50%, 70%, 90% {
+        transform: translateX(-10px) rotate(-2deg);
+      }
+      20%, 40%, 60%, 80% {
+        transform: translateX(10px) rotate(2deg);
+      }
+    }
+
+    .shaking {
+      animation: shake 0.5s ease-in-out;
+    }
+
+    @media (max-width: 640px) {
+      .etch-controls {
+        flex-direction: column;
+        gap: 1.5rem;
+      }
+
+      .knob {
+        width: 4rem;
+        height: 4rem;
+      }
+
+      .etch-instructions ul {
+        gap: 1rem;
+      }
+
+      .etch-instructions li {
+        flex-wrap: wrap;
+      }
+    }
+  </style>
+</BaseLayout>
