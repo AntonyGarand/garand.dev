@@ -1,0 +1,149 @@
+---
+/**
+ * AnimationToggle Component
+ *
+ * Interactive button that toggles between animated and static background.
+ * Persists user preference to sessionStorage and respects system reduced-motion preference.
+ * Displays play icon when animation is paused, pause icon when animation is running.
+ *
+ * Features:
+ * - Persists animation preference to sessionStorage
+ * - Respects system reduced-motion preference (prefers-reduced-motion)
+ * - Works with Astro View Transitions via event delegation
+ * - Accessible with keyboard focus and ARIA labels
+ *
+ * @component
+ *
+ * @example
+ * ```astro
+ * <AnimationToggle />
+ * ```
+ */
+---
+
+<button
+  class="animation-toggle"
+  type="button"
+  aria-label="Toggle animation"
+  title="Toggle animation"
+>
+  <svg
+    class="icon icon-pause"
+    width="18"
+    height="18"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    stroke-width="2"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  >
+    <rect x="6" y="4" width="4" height="16"></rect>
+    <rect x="14" y="4" width="4" height="16"></rect>
+  </svg>
+  <svg
+    class="icon icon-play"
+    width="18"
+    height="18"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    stroke-width="2"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  >
+    <polygon points="5 3 19 12 5 21 5 3"></polygon>
+  </svg>
+</button>
+
+<style>
+  .animation-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    background: transparent;
+    border: none;
+    border-radius: var(--border-radius-sm);
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    transition:
+      color var(--transition-fast),
+      background var(--transition-fast);
+    flex-shrink: 0;
+  }
+
+  .animation-toggle:hover {
+    color: var(--color-text);
+    background: var(--color-bg-secondary);
+  }
+
+  .animation-toggle:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+
+  .icon-pause {
+    display: block;
+  }
+
+  .icon-play {
+    display: none;
+  }
+
+  :global([data-animation="paused"]) .icon-pause {
+    display: none;
+  }
+
+  :global([data-animation="paused"]) .icon-play {
+    display: block;
+  }
+</style>
+
+<script>
+  import { AnimationState } from "../types/Common";
+  // Get animation state from storage or system preference
+  const getAnimationState = (): AnimationState => {
+    const stored = sessionStorage.getItem("animation");
+    if (stored === AnimationState.Running || stored === AnimationState.Paused) {
+      return stored as AnimationState;
+    }
+    return typeof window !== "undefined" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches
+      ? AnimationState.Paused
+      : AnimationState.Running;
+  };
+
+  const setAnimationState = (state: AnimationState) => {
+    document.documentElement.setAttribute("data-animation", state);
+    sessionStorage.setItem("animation", state);
+  };
+  const setInitialState = () => {
+    if (!document.documentElement.getAttribute("data-animation")) {
+      const initialState = getAnimationState();
+      setAnimationState(initialState);
+    }
+  };
+
+  const toggleAnimation = () => {
+    const current = document.documentElement.getAttribute("data-animation");
+    setAnimationState(
+      current === AnimationState.Running
+        ? AnimationState.Paused
+        : AnimationState.Running,
+    );
+  };
+
+  document.addEventListener("click", (e) => {
+    const toggle = (e.target as Element).closest(".animation-toggle");
+    if (toggle) {
+      toggleAnimation();
+    }
+  });
+
+  document.addEventListener("astro:page-load", () => {
+    setInitialState();
+  });
+</script>

@@ -16,5 +16,7 @@ Todos:
   - Share my side projects, any other technical content
   - ~~Write a new post about leaving amazon~~
   - Write about my time as a teacher in Quebec for SMBs on the new security measures
+  - Write about the background I built
+  - Do few fun experiments: Maybe an etch-a-sketch prototype, and develop some visualization algorithm for it.
 - Add comments via github
-- Add option to remove dynamic background
+- ~~Add option to remove dynamic background (prefers-reduced-motion)~~

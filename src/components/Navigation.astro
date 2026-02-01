@@ -19,6 +19,7 @@
  */
 import { siteConfig } from '../config';
 import ThemeToggle from './ThemeToggle.astro';
+import AnimationToggle from './AnimationToggle.astro';
 
 const currentPath = Astro.url.pathname;
 
@@ -68,6 +69,7 @@ const isActive = (href: string) => {
     </ul>
   </div>
   <div class="nav-end">
+    <AnimationToggle />
     <ThemeToggle />
   </div>
 </nav>
