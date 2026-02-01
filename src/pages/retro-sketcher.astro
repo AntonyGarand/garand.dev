@@ -40,12 +40,20 @@ import { pagesConfig } from '../pages.config';
     </header>
 
     <div class="etch-container" id="etchContainer">
+      <!-- Mode Switch -->
+      <div class="mode-switch" id="modeSwitch">
+        <button class="mode-button active" id="modeManual" data-mode="manual">Manual Draw</button>
+        <button class="mode-button" id="modePhoto" data-mode="photo">Photo Convert</button>
+      </div>
+
       <div class="etch-frame">
         <div class="etch-screen">
           <canvas id="etchCanvas"></canvas>
+          <video id="webcamVideo" class="webcam-video" autoplay playsinline style="display: none;"></video>
         </div>
 
-        <div class="etch-controls">
+        <!-- Manual Mode Controls -->
+        <div class="etch-controls" id="manualControls">
           <div class="knob-container">
             <button
               class="knob"
@@ -78,6 +86,49 @@ import { pagesConfig } from '../pages.config';
             </button>
             <span class="knob-label">Horizontal</span>
           </div>
+        </div>
+
+        <!-- Photo Mode Controls -->
+        <div class="photo-controls" id="photoControls" style="display: none;">
+          <div class="photo-buttons">
+            <label class="photo-button" id="uploadButton">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="17 8 12 3 7 8"/>
+                <line x1="12" y1="3" x2="12" y2="15"/>
+              </svg>
+              Upload Photo
+              <input type="file" id="fileInput" accept="image/*" style="display: none;">
+            </label>
+
+            <button class="photo-button" id="webcamButton">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                <circle cx="12" cy="13" r="4"/>
+              </svg>
+              Webcam
+            </button>
+
+            <button class="photo-button capture-button" id="captureButton" style="display: none;">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"/>
+                <circle cx="12" cy="12" r="3"/>
+              </svg>
+              Capture
+            </button>
+
+            <button class="convert-button" id="convertButton">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 3v18"/>
+                <path d="M3 12h18"/>
+                <path d="M7 12l5-5 5 5"/>
+                <path d="M12 7v10"/>
+              </svg>
+              Convert to Sketch
+            </button>
+          </div>
+
+          <div class="photo-status" id="photoStatus"></div>
         </div>
       </div>
 
@@ -354,8 +405,587 @@ import { pagesConfig } from '../pages.config';
       }
     }
 
+    // === CONFIGURABLE PARAMETERS ===
+    const LINE_DENSITY = 5000;              // Points to sample from edges (1000-8000)
+    const EDGE_DETECTION_LOW_THRESHOLD = 30;  // Canny low threshold (20-80) - lower for more edges
+    const EDGE_DETECTION_HIGH_THRESHOLD = 90; // Canny high threshold (60-150) - lower for more detail
+    const GAUSSIAN_BLUR_SIGMA = 1.5;       // Blur strength (1.0-2.0)
+    const SIMPLIFICATION_TOLERANCE = 2;        // Douglas-Peucker tolerance (1-3 pixels)
+    // ASPECT_RATIO_LOCK: configurable parameter for aspect ratio locking (not currently used)
+
+    class PhotoConverter {
+      private canvas: HTMLCanvasElement;
+      private ctx: CanvasRenderingContext2D;
+      private video: HTMLVideoElement;
+      private fileInput: HTMLInputElement;
+
+      private webcamButton: HTMLElement;
+      private captureButton: HTMLElement;
+      private convertButton: HTMLButtonElement;
+      private photoStatus: HTMLElement;
+      private manualControls: HTMLElement;
+      private photoControls: HTMLElement;
+      private modeManual: HTMLElement;
+      private modePhoto: HTMLElement;
+
+      private stream: MediaStream | null = null;
+      private currentImage: HTMLImageElement | null = null;
+      private isProcessing: boolean = false;
+
+      constructor() {
+        this.canvas = document.getElementById('etchCanvas') as HTMLCanvasElement;
+        this.ctx = this.canvas.getContext('2d')!;
+        this.video = document.getElementById('webcamVideo') as HTMLVideoElement;
+        this.fileInput = document.getElementById('fileInput') as HTMLInputElement;
+
+        this.webcamButton = document.getElementById('webcamButton')!;
+        this.captureButton = document.getElementById('captureButton')!;
+        this.convertButton = document.getElementById('convertButton') as HTMLButtonElement;
+        this.photoStatus = document.getElementById('photoStatus')!;
+        this.manualControls = document.getElementById('manualControls')!;
+        this.photoControls = document.getElementById('photoControls')!;
+        this.modeManual = document.getElementById('modeManual')!;
+        this.modePhoto = document.getElementById('modePhoto')!;
+
+        this.init();
+      }
+
+      private init(): void {
+        this.bindEvents();
+        this.setMode('manual');
+      }
+
+      private bindEvents(): void {
+        // Mode switching
+        this.modeManual.addEventListener('click', () => this.setMode('manual'));
+        this.modePhoto.addEventListener('click', () => this.setMode('photo'));
+
+        // File upload
+        this.fileInput.addEventListener('change', (e) => this.handleFileUpload(e));
+
+        // Webcam
+        this.webcamButton.addEventListener('click', () => this.startWebcam());
+        this.captureButton.addEventListener('click', () => this.captureWebcam());
+
+        // Convert
+        this.convertButton.addEventListener('click', () => this.convertToSketch());
+      }
+
+      private setMode(mode: 'manual' | 'photo'): void {
+        // Update button states
+        this.modeManual.classList.toggle('active', mode === 'manual');
+        this.modePhoto.classList.toggle('active', mode === 'photo');
+
+        // Show/hide controls
+        this.manualControls.style.display = mode === 'manual' ? 'flex' : 'none';
+        this.photoControls.style.display = mode === 'photo' ? 'block' : 'none';
+
+        // Show/hide video
+        this.video.style.display = 'none';
+
+        // Stop webcam if switching to manual
+        if (mode === 'manual' && this.stream) {
+          this.stopWebcam();
+        }
+
+        // Clear status
+        this.setStatus('');
+      }
+
+      private setStatus(message: string): void {
+        this.photoStatus.textContent = message;
+      }
+
+      private handleFileUpload(event: Event): void {
+        const target = event.target as HTMLInputElement;
+        const file = target.files?.[0];
+
+        if (!file) return;
+
+        if (!file.type.startsWith('image/')) {
+          this.setStatus('Please select an image file');
+          return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const img = new Image();
+          img.onload = () => {
+            this.currentImage = img;
+            this.displayImage(img);
+            this.setStatus(`Loaded: ${file.name}`);
+          };
+          img.src = e.target?.result as string;
+        };
+        reader.readAsDataURL(file);
+      }
+
+      private async startWebcam(): Promise<void> {
+        try {
+          this.stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: 'environment' },
+            audio: false
+          });
+
+          this.video.srcObject = this.stream;
+          this.video.style.display = 'block';
+          this.webcamButton.style.display = 'none';
+          this.captureButton.style.display = 'flex';
+          this.setStatus('Camera active - click Capture to take photo');
+        } catch (err) {
+          this.setStatus('Camera access denied or not available');
+          console.error('Webcam error:', err);
+        }
+      }
+
+      private stopWebcam(): void {
+        if (this.stream) {
+          this.stream.getTracks().forEach(track => track.stop());
+          this.stream = null;
+        }
+        this.video.srcObject = null;
+        this.webcamButton.style.display = 'flex';
+        this.captureButton.style.display = 'none';
+      }
+
+      private captureWebcam(): void {
+        if (!this.video.videoWidth) {
+          this.setStatus('Camera not ready yet');
+          return;
+        }
+
+        // Create temporary canvas to capture frame
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = this.video.videoWidth;
+        tempCanvas.height = this.video.videoHeight;
+        const tempCtx = tempCanvas.getContext('2d')!;
+        tempCtx.drawImage(this.video, 0, 0);
+
+        // Convert to image
+        const img = new Image();
+        img.onload = () => {
+          this.currentImage = img;
+          this.displayImage(img);
+          this.setStatus('Photo captured');
+          this.stopWebcam();
+          this.video.style.display = 'none';
+        };
+        img.src = tempCanvas.toDataURL('image/jpeg');
+      }
+
+      private displayImage(img: HTMLImageElement): void {
+        // Resize canvas to match image aspect ratio
+        const maxWidth = this.canvas.parentElement!.clientWidth;
+        const maxHeight = Math.min(maxWidth * 0.75, 500);
+
+        let width = img.width;
+        let height = img.height;
+
+        // Scale down if too large
+        if (width > maxWidth || height > maxHeight) {
+          const scale = Math.min(maxWidth / width, maxHeight / height);
+          width *= scale;
+          height *= scale;
+        }
+
+        this.canvas.width = width;
+        this.canvas.height = height;
+
+        // Draw image
+        this.ctx.drawImage(img, 0, 0, width, height);
+      }
+
+      private async convertToSketch(): Promise<void> {
+        if (!this.currentImage) {
+          this.setStatus('Please upload or capture an image first');
+          return;
+        }
+
+        if (this.isProcessing) {
+          return;
+        }
+
+        this.isProcessing = true;
+        this.convertButton.disabled = true;
+        this.setStatus('Processing...');
+
+        try {
+          // Step 1: Get image data
+          const imageData = this.ctx.getImageData(0, 0, this.canvas.width, this.canvas.height);
+
+          // Step 2: Convert to grayscale
+          const grayData = this.toGrayscale(imageData);
+
+          // Step 3: Apply Gaussian blur
+          const blurredData = this.applyGaussianBlur(grayData, this.canvas.width, this.canvas.height, GAUSSIAN_BLUR_SIGMA);
+
+          // Step 4: Canny edge detection
+          const edges = this.cannyEdgeDetection(blurredData, this.canvas.width, this.canvas.height);
+
+          // Step 5: Sample points from edges
+          const points = this.samplePointsFromEdges(edges, this.canvas.width, this.canvas.height);
+
+          if (points.length < 10) {
+            this.setStatus('Not enough edges detected. Try a different image.');
+            this.isProcessing = false;
+            this.convertButton.disabled = false;
+            return;
+          }
+
+          // Step 6: TSP path tracing
+          const path = this.tspPathTracing(points);
+
+          // Step 7: Douglas-Peucker simplification
+          const simplifiedPath = this.simplifyPath(path);
+
+          // Step 8: Render to canvas
+          this.renderSketch(simplifiedPath);
+
+          this.setStatus(`Converted! Sampled ${points.length} points, simplified to ${simplifiedPath.length} points`);
+        } catch (err) {
+          this.setStatus('Error during conversion');
+          console.error('Conversion error:', err);
+        } finally {
+          this.isProcessing = false;
+          this.convertButton.disabled = false;
+        }
+      }
+
+      private toGrayscale(imageData: ImageData): Uint8Array {
+        const data = imageData.data;
+        const gray = new Uint8Array(imageData.width * imageData.height);
+
+        for (let i = 0; i < data.length; i += 4) {
+          const luminance = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+          gray[i / 4] = luminance;
+        }
+
+        return gray;
+      }
+
+      private applyGaussianBlur(data: Uint8Array, width: number, height: number, sigma: number): Uint8Array {
+        // Create Gaussian kernel
+        const kernelSize = Math.ceil(sigma * 6) | 1;
+        const kernel = new Float32Array(kernelSize);
+        const halfSize = kernelSize >> 1;
+        const sigmaSq = sigma * sigma;
+        let sum = 0;
+
+        for (let i = 0; i < kernelSize; i++) {
+          const x = i - halfSize;
+          kernel[i] = Math.exp(-(x * x) / (2 * sigmaSq));
+          sum += kernel[i];
+        }
+
+        // Normalize kernel
+        for (let i = 0; i < kernelSize; i++) {
+          kernel[i] /= sum;
+        }
+
+        // Apply horizontal blur
+        const temp = new Uint8Array(width * height);
+        for (let y = 0; y < height; y++) {
+          for (let x = 0; x < width; x++) {
+            let value = 0;
+            for (let k = 0; k < kernelSize; k++) {
+              const px = Math.min(width - 1, Math.max(0, x + k - halfSize));
+              value += data[y * width + px] * kernel[k];
+            }
+            temp[y * width + x] = value;
+          }
+        }
+
+        // Apply vertical blur
+        const result = new Uint8Array(width * height);
+        for (let y = 0; y < height; y++) {
+          for (let x = 0; x < width; x++) {
+            let value = 0;
+            for (let k = 0; k < kernelSize; k++) {
+              const py = Math.min(height - 1, Math.max(0, y + k - halfSize));
+              value += temp[py * width + x] * kernel[k];
+            }
+            result[y * width + x] = value;
+          }
+        }
+
+        return result;
+      }
+
+      private cannyEdgeDetection(data: Uint8Array, width: number, height: number): Uint8Array {
+        // Step 1: Compute gradients using Sobel operator
+        const gradients = new Float32Array(width * height);
+        const directions = new Float32Array(width * height);
+
+        for (let y = 1; y < height - 1; y++) {
+          for (let x = 1; x < width - 1; x++) {
+            const idx = y * width + x;
+
+            // Sobel X
+            const gx =
+              -1 * data[(y - 1) * width + (x - 1)] +
+              -2 * data[y * width + (x - 1)] +
+              -1 * data[(y + 1) * width + (x - 1)] +
+              1 * data[(y - 1) * width + (x + 1)] +
+              2 * data[y * width + (x + 1)] +
+              1 * data[(y + 1) * width + (x + 1)];
+
+            // Sobel Y
+            const gy =
+              -1 * data[(y - 1) * width + (x - 1)] +
+              -2 * data[(y - 1) * width + x] +
+              -1 * data[(y - 1) * width + (x + 1)] +
+              1 * data[(y + 1) * width + (x - 1)] +
+              2 * data[(y + 1) * width + x] +
+              1 * data[(y + 1) * width + (x + 1)];
+
+            gradients[idx] = Math.sqrt(gx * gx + gy * gy);
+            directions[idx] = Math.atan2(gy, gx);
+          }
+        }
+
+        // Step 2: Non-maximum suppression
+        const suppressed = new Float32Array(width * height);
+        for (let y = 1; y < height - 1; y++) {
+          for (let x = 1; x < width - 1; x++) {
+            const idx = y * width + x;
+            const grad = gradients[idx];
+            const dir = directions[idx];
+
+            // Quantize direction to 0, 45, 90, 135 degrees
+            const angle = ((dir + Math.PI) * 180 / Math.PI) % 180;
+            let neighbor1 = 0, neighbor2 = 0;
+
+            if ((angle >= 0 && angle < 22.5) || (angle >= 157.5)) {
+              // Horizontal
+              neighbor1 = gradients[idx - 1];
+              neighbor2 = gradients[idx + 1];
+            } else if (angle >= 22.5 && angle < 67.5) {
+              // Diagonal 45
+              neighbor1 = gradients[idx - width - 1];
+              neighbor2 = gradients[idx + width + 1];
+            } else if (angle >= 67.5 && angle < 112.5) {
+              // Vertical
+              neighbor1 = gradients[idx - width];
+              neighbor2 = gradients[idx + width];
+            } else {
+              // Diagonal 135
+              neighbor1 = gradients[idx - width + 1];
+              neighbor2 = gradients[idx + width - 1];
+            }
+
+            if (grad >= neighbor1 && grad >= neighbor2) {
+              suppressed[idx] = grad;
+            }
+          }
+        }
+
+        // Step 3: Double threshold and edge tracking
+        const edges = new Uint8Array(width * height);
+        const strong = 255;
+        const weak = 75;
+
+        for (let i = 0; i < suppressed.length; i++) {
+          if (suppressed[i] >= EDGE_DETECTION_HIGH_THRESHOLD) {
+            edges[i] = strong;
+          } else if (suppressed[i] >= EDGE_DETECTION_LOW_THRESHOLD) {
+            edges[i] = weak;
+          }
+        }
+
+        // Step 4: Edge tracking by hysteresis
+        for (let y = 1; y < height - 1; y++) {
+          for (let x = 1; x < width - 1; x++) {
+            const idx = y * width + x;
+            if (edges[idx] === weak) {
+              // Check if connected to strong edge
+              let connected = false;
+              for (let dy = -1; dy <= 1 && !connected; dy++) {
+                for (let dx = -1; dx <= 1; dx++) {
+                  if (edges[(y + dy) * width + (x + dx)] === strong) {
+                    connected = true;
+                    break;
+                  }
+                }
+              }
+              edges[idx] = connected ? strong : 0;
+            }
+          }
+        }
+
+        // Convert to binary
+        for (let i = 0; i < edges.length; i++) {
+          edges[i] = edges[i] === strong ? 255 : 0;
+        }
+
+        return edges;
+      }
+
+      private samplePointsFromEdges(edges: Uint8Array, width: number, height: number): Array<{x: number, y: number}> {
+        const points: Array<{x: number, y: number}> = [];
+
+        // Collect all edge pixels
+        for (let y = 0; y < height; y++) {
+          for (let x = 0; x < width; x++) {
+            if (edges[y * width + x] > 0) {
+              points.push({ x, y });
+            }
+          }
+        }
+
+        // If too many points, sample randomly
+        if (points.length > LINE_DENSITY) {
+          // Shuffle and take first N
+          for (let i = points.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [points[i], points[j]] = [points[j], points[i]];
+          }
+          return points.slice(0, LINE_DENSITY);
+        }
+
+        return points;
+      }
+
+      private tspPathTracing(points: Array<{x: number, y: number}>): Array<{x: number, y: number}> {
+        if (points.length <= 1) return points;
+
+        const path: Array<{x: number, y: number}> = [points[0]];
+        const unvisited = new Set(points.slice(1));
+
+        // Nearest neighbor heuristic
+        while (unvisited.size > 0) {
+          const current = path[path.length - 1];
+          let nearest: {x: number, y: number} | null = null;
+          let minDist = Infinity;
+
+          for (const point of unvisited) {
+            const dx = current.x - point.x;
+            const dy = current.y - point.y;
+            const dist = dx * dx + dy * dy; // Squared distance (no sqrt needed for comparison)
+
+            if (dist < minDist) {
+              minDist = dist;
+              nearest = point;
+            }
+          }
+
+          if (nearest) {
+            path.push(nearest);
+            unvisited.delete(nearest);
+          }
+        }
+
+        // 2-opt refinement (simplified)
+        let improved = true;
+        let iterations = 0;
+        const maxIterations = 100;
+
+        while (improved && iterations < maxIterations) {
+          improved = false;
+          iterations++;
+
+          for (let i = 0; i < path.length - 1; i++) {
+            for (let j = i + 2; j < path.length; j++) {
+              const a = path[i];
+              const b = path[i + 1];
+              const c = path[j];
+              const d = path[(j + 1) % path.length];
+
+              const dist1 = (a.x - b.x) ** 2 + (a.y - b.y) ** 2 + (c.x - d.x) ** 2 + (c.y - d.y) ** 2;
+              const dist2 = (a.x - c.x) ** 2 + (a.y - c.y) ** 2 + (b.x - d.x) ** 2 + (b.y - d.y) ** 2;
+
+              if (dist2 < dist1) {
+                // Reverse segment
+                const segment = path.slice(i + 1, j + 1).reverse();
+                path.splice(i + 1, j - i, ...segment);
+                improved = true;
+              }
+            }
+          }
+        }
+
+        return path;
+      }
+
+      private simplifyPath(path: Array<{x: number, y: number}>): Array<{x: number, y: number}> {
+        if (path.length <= 2) return path;
+
+        // Douglas-Peucker algorithm
+        const simplify = (points: Array<{x: number, y: number}>, tolerance: number): Array<{x: number, y: number}> => {
+          if (points.length <= 2) return points;
+
+          // Find point with maximum distance from line between first and last
+          let maxDist = 0;
+          let maxIndex = 0;
+
+          const first = points[0];
+          const last = points[points.length - 1];
+
+          for (let i = 1; i < points.length - 1; i++) {
+            const dist = this.pointToLineDistance(points[i], first, last);
+            if (dist > maxDist) {
+              maxDist = dist;
+              maxIndex = i;
+            }
+          }
+
+          if (maxDist > tolerance) {
+            // Recursively simplify
+            const left = simplify(points.slice(0, maxIndex + 1), tolerance);
+            const right = simplify(points.slice(maxIndex), tolerance);
+            return left.slice(0, -1).concat(right);
+          } else {
+            return [first, last];
+          }
+        };
+
+        return simplify(path, SIMPLIFICATION_TOLERANCE);
+      }
+
+      private pointToLineDistance(point: {x: number, y: number}, lineStart: {x: number, y: number}, lineEnd: {x: number, y: number}): number {
+        const dx = lineEnd.x - lineStart.x;
+        const dy = lineEnd.y - lineStart.y;
+        const lenSq = dx * dx + dy * dy;
+
+        if (lenSq === 0) {
+          return Math.sqrt((point.x - lineStart.x) ** 2 + (point.y - lineStart.y) ** 2);
+        }
+
+        let t = ((point.x - lineStart.x) * dx + (point.y - lineStart.y) * dy) / lenSq;
+        t = Math.max(0, Math.min(1, t));
+
+        const projX = lineStart.x + t * dx;
+        const projY = lineStart.y + t * dy;
+
+        return Math.sqrt((point.x - projX) ** 2 + (point.y - projY) ** 2);
+      }
+
+      private renderSketch(path: Array<{x: number, y: number}>): void {
+        // Clear canvas with etch-a-sketch background
+        this.ctx.fillStyle = '#d4c4a8';
+        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+
+        // Draw path
+        if (path.length < 2) return;
+
+        this.ctx.strokeStyle = '#1a1a1a';
+        this.ctx.lineWidth = 2;
+        this.ctx.lineCap = 'round';
+        this.ctx.lineJoin = 'round';
+
+        this.ctx.beginPath();
+        this.ctx.moveTo(path[0].x, path[0].y);
+
+        for (let i = 1; i < path.length; i++) {
+          this.ctx.lineTo(path[i].x, path[i].y);
+        }
+
+        this.ctx.stroke();
+      }
+    }
+
     document.addEventListener('astro:page-load', () => {
       new RetroSketcher();
+      new PhotoConverter();
     });
   </script>
 
@@ -364,6 +994,140 @@ import { pagesConfig } from '../pages.config';
       max-width: 800px;
       margin: 0 auto;
       padding: 2rem 1rem;
+    }
+
+    /* Mode Switch */
+    .mode-switch {
+      display: flex;
+      justify-content: center;
+      gap: 0.5rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .mode-button {
+      padding: 0.75rem 1.5rem;
+      background: var(--color-surface);
+      border: 2px solid var(--color-border);
+      border-radius: 0.5rem;
+      color: var(--color-text);
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .mode-button:hover {
+      border-color: #cc2a2a;
+    }
+
+    .mode-button.active {
+      background: #cc2a2a;
+      border-color: #cc2a2a;
+      color: white;
+    }
+
+    /* Webcam Video */
+    .webcam-video {
+      position: absolute;
+      top: 0.5rem;
+      left: 0.5rem;
+      width: calc(100% - 1rem);
+      height: calc(100% - 1rem);
+      border-radius: 0.5rem;
+      object-fit: cover;
+    }
+
+    /* Photo Controls */
+    .photo-controls {
+      padding: 0 1rem;
+    }
+
+    .photo-buttons {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 0.75rem;
+    }
+
+    .photo-button {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: linear-gradient(145deg, #ffffff 0%, #e0e0e0 100%);
+      border: none;
+      border-radius: 0.5rem;
+      padding: 0.75rem 1.25rem;
+      color: #1a1a1a;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+      transition: all 0.2s ease;
+    }
+
+    .photo-button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 12px rgba(0, 0, 0, 0.25);
+    }
+
+    .photo-button:active {
+      transform: translateY(0);
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    }
+
+    .photo-button svg {
+      width: 1.25rem;
+      height: 1.25rem;
+    }
+
+    .capture-button {
+      background: linear-gradient(145deg, #ff6b6b 0%, #cc2a2a 100%);
+      color: white;
+    }
+
+    .convert-button {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: linear-gradient(145deg, #4ecdc4 0%, #2a9d8f 100%);
+      border: none;
+      border-radius: 0.5rem;
+      padding: 0.75rem 1.5rem;
+      color: white;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+      transition: all 0.2s ease;
+    }
+
+    .convert-button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 12px rgba(0, 0, 0, 0.25);
+    }
+
+    .convert-button:active {
+      transform: translateY(0);
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    }
+
+    .convert-button svg {
+      width: 1.25rem;
+      height: 1.25rem;
+    }
+
+    .convert-button:disabled {
+      background: linear-gradient(145deg, #999 0%, #666 100%);
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .photo-status {
+      text-align: center;
+      margin-top: 1rem;
+      color: rgba(255, 255, 255, 0.9);
+      font-size: 0.9rem;
+      min-height: 1.5rem;
     }
 
     .etch-frame {
@@ -394,6 +1158,8 @@ import { pagesConfig } from '../pages.config';
       padding: 0.5rem;
       box-shadow: inset 0 4px 12px rgba(0, 0, 0, 0.5);
       margin-bottom: 1.5rem;
+      position: relative;
+      overflow: hidden;
     }
 
     #etchCanvas {
@@ -576,6 +1342,28 @@ import { pagesConfig } from '../pages.config';
 
       .etch-instructions li {
         flex-wrap: wrap;
+      }
+
+      .mode-switch {
+        flex-direction: column;
+        align-items: center;
+      }
+
+      .mode-button {
+        width: 100%;
+        max-width: 200px;
+      }
+
+      .photo-buttons {
+        flex-direction: column;
+        align-items: center;
+      }
+
+      .photo-button,
+      .convert-button {
+        width: 100%;
+        max-width: 200px;
+        justify-content: center;
       }
     }
   </style>
