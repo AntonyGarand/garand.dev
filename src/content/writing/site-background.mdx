@@ -1,4 +1,3 @@
-
 ---
 title: "Creating a new site background"
 description: "As I've migrated my website to using Astro, I wanted to display more creativity by using a dynamic background. Here's the process I went through to create a new unique background."
@@ -9,70 +8,236 @@ tags:
 type:
  - note
  - post
-draft: true
+draft: false
 ---
 
-If you're reading this, thanks for looking into my content with so much depth!
-
-This is still a very rough draft of what I'd like to write about: I've been focusing on the actual implementation and will polish this article during the following days as I've been in a good development flow.
+import CursorDemo from '../../components/demos/CursorDemo.astro';
 
 # Creating a new site background
 
-I have always been inspired by the works of others within creative programming: Whenever a new creative website is shared on [hackernews](https://news.ycombinator.com/) or [lobste.rs](https://lobste.rs/), I find myself marveling at the ingenuity some engineers can display within their website.  
+I have always been inspired by the works of others within creative programming. Whenever a new creative website is shared on [Hacker News](https://news.ycombinator.com/) or [Lobsters](https://lobste.rs/), I find myself marveling at the ingenuity some engineers can display within their personal websites.
 
-With my role being impacted by recent layoffs from Amazon, I finally found myself with some time to review and update my website, providing me with an opportunity to have some fun with some of the web technologies I've wished to dabble with for a long time.
+After my role was impacted by layoffs at Amazon, I found myself with time to review and update my website: an opportunity to experiment with web technologies I've long wished to explore.
 
-While I love creative engineering, the most important criteria for my website is to be functional, so I had to keep the creative aspect to an optional background element, something that can give you some wow factor without impacting your time on the website should you want to ignore it.
-It would be fun to min-max my portfolio so it could be shared across the network at the expense of not being as accessible or harder to get the relevant information, but I'll leave my experiments into their own sections instead of on the whole site.
+While I love creative engineering, the most important criterion for my website is functionality. I had to keep the creative aspect as an optional background element, something that can provide a "wow" factor without impacting the visitor's ability to access information should they choose to ignore it. It would be fun to optimize my portfolio for viral sharing across the network at the expense of accessibility or information clarity, but I'll leave those experiments in their own sections rather than applied to the whole site.
 
+## Idea gathering
 
-# Idea gathering
+My first thought was to create a "doorway" to the website, such as opening curtains or an effect resembling the light at the end of a tunnel. However, I quickly decided against these approaches: while they can serve as great showcases for entering the site, they're temporary by nature and can interfere with the primary purpose of the website, providing access to information.
 
-My first thoughts was to have a "doorway" to the website, such as opening curtains or an effect like the light at the end of a tunnel, but I quickly opted to not make one of these: While these can be a great showcase to enter the site, they're temporary by nature and can impact the primary use of the website, its access to information.
+Another idea I considered was incorporating more 3D elements, similar to [Bruno Simon's portfolio](https://bruno-simon.com/), which features an interactive 3D car that visitors can drive around. Sites like [Blue Shirt](http://blueshirt.com/) and [Abeto Messenger](https://messenger.abeto.co/) demonstrate how immersive 3D experiences can create memorable impressions.
 
-Another thoughts I gave consideration to was using more 3d elements, such as [Bruno Simon's site](https://bruno-simon.com/) 
+With that said, I still wanted my site to have its own distinctive twist, something discrete that would not interfere with base navigation while showcasing my skills within web technologies. I concluded that an interactive background would be a good starting point.
 
-http://blueshirt.com/
+Now that I had decided to create a background effect, I needed to find inspiration and give it my own interpretation. I explored [Three.js demos](https://threejsdemos.com/demos/basics/points-cloud), reminisced about [Pointer Pointer](https://pointerpointer.com/), and examined line-based backgrounds like those on [NextBricks](https://nextbricks.io/interactive-lines).
 
-https://messenger.abeto.co/
+Finally, I had my concept: create a 3D point cloud of minimalist cursor pointers aiming toward the user's cursor, a fusion of line-based sighting and 3D geography while remaining simple enough to not distract visitors.
 
-With that said, I still wanted my site to have its own little fun twist, something discrete that would not tamper with the base navigation while showcasing my skills within web technologies: I figured a fun interactive background would be a good starting point.
+## Choosing Three.js
 
-Now that I knew I wanted to make a background effect, time to find inspiration and give it my own twist.
+For this project, I chose Three.js for several reasons:
 
-Looking at ThreeJS demos and reminiscing about [pointerpointer](https://pointerpointer.com/) as well as line-based backgrounds https://nextbricks.io/interactive-lines
+**Performance with many elements**: Three.js uses WebGL to render everything on the GPU, handling thousands of objects efficiently. A canvas-based approach would require significantly more overhead for each visual item.
 
+**3D transformations**: Three.js provides native 3D math utilities including quaternions for rotation, perspective cameras, and depth buffering. These built-in features simplified the implementation of cursors rotating in 3D space toward the mouse position.
 
-Finally, I had my idea: 
-Make a 3d point cloud of minimalist 2d pointers aiming towards the user pointer, a mix of line-based sighting and 3d geography while remaining simple enough to not distract visitors.
+**Smooth animations**: Three.js runs an animation loop at 60fps, interpolating positions and rotations each frame. A game-loop approach works better for a continuously running interactive background than transition-based animation systems.
 
-# Implementation
+**Memory efficiency**: WebGL textures and geometry batching reduce memory overhead compared to creating many individual elements with their associated DOM nodes and event listeners.
 
-## Making a cursor
-As I was working with a 3d point cloud, I had the option of making a 3d cursor, such as a code on a cylinder, or keeping with a 2d cursor and shifting the 
-- Todo: Experiment with 3d and outline vs 2d
+## Implementation
 
-## Making it follow my own cursor
+### Creating the cursor geometry
 
-## Adding variance
-A bit of color, accounting for light mode and dark mode, varying speed to center back on the pointer, Bézier curve for the snapping maybe
-Different styles: 3d planes view, wireframe view, 2d item on 3d plane, 
-2d cursor: Aligning it with the background so it points to the correct angle.
+The first step was designing the cursor arrow itself. I wanted multiple visual styles for variety, so I created four distinct cursor types: outline, mesh, plane, and plain.
 
-## Adding a trail / effect to the cursor
+<div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin: 1.5rem 0;">
+  <CursorDemo type="outline" />
+  <CursorDemo type="mesh" />
+  <CursorDemo type="plane" />
+  <CursorDemo type="plain" />
+</div>
 
+*Hover over each cursor to see how it rotates toward your mouse position.*
 
-## Making it work seamlessly across pages
-As this site is built using astro, the Canvas used by ThreeJS is scoped to the current page, and navigating to a different page would reset the background effect, making it distracting.
+The 3D arrow geometry uses Three.js's `ExtrudeGeometry` to create depth from a 2D shape. The arrow shape is defined with vertices forming a triangular head and rectangular shaft:
 
-Thankfully, astro thought of such use cases and provided us with ...
+```javascript
+const shape = new THREE.Shape();
+shape.moveTo(0, 0.2);       // Tip of arrow
+shape.lineTo(-0.08, 0.05);  // Left edge of head
+shape.lineTo(-0.04, 0.05);  // Inner left corner
+shape.lineTo(-0.04, -0.15); // Bottom left of shaft
+shape.lineTo(0.04, -0.15);  // Bottom right of shaft
+shape.lineTo(0.04, 0.05);   // Inner right corner
+shape.lineTo(0.08, 0.05);   // Right edge of head
+shape.lineTo(0, 0.2);       // Back to tip
+```
 
-# Keeping the content clear
-Reverse vignette so the center of the website remains clear of any obstructions and the text maintains a good contrast ratio.
-A simple way to achieve this is to use a vignette and darken the background within the main content body.
+The `geometry.center()` call ensures the pivot point is at the center of the arrow, which is essential for proper rotation later.
 
-Alternatively, I could use a card-based content wrapper which blurs the background, keeping the overall content crisp, a bit like liquid glass but blurry instead of fancy.
+Each cursor type uses different materials to achieve its visual effect:
 
+- **Outline**: Uses `LineBasicMaterial` with `EdgesGeometry` for a linear look
+- **Mesh**: Uses `MeshBasicMaterial` with `wireframe: true` for a solid wireframe appearance
+- **Plane**: Uses `MeshBasicMaterial` with low opacity and `side: THREE.DoubleSide` for a translucent fill
+- **Plain**: Uses `LineBasicMaterial` for a simple 2D line drawing
 
+### Aiming the cursors
 
-https://threejsdemos.com/demos/basics/points-cloud
+The core interaction is having all cursors point toward the user's mouse position. This required converting screen coordinates to 3D world space and calculating rotation quaternions.
+
+First, I track the mouse position normalized to world coordinates:
+
+```javascript
+document.addEventListener("mousemove", (event) => {
+  mouseX = (event.clientX / window.innerWidth) * 2 - 1;
+  mouseY = -(event.clientY / window.innerHeight) * 2 + 1;
+});
+```
+
+For rotation, I use quaternion slerping (spherical linear interpolation) to smoothly orient each cursor toward the target:
+
+```javascript
+const direction = new THREE.Vector3(
+  targetX - cursor.position.x,
+  targetY - finalY,
+  targetZ - cursor.position.z
+).normalize();
+
+const targetQuaternion = new THREE.Quaternion().setFromUnitVectors(
+  new THREE.Vector3(0, 1, 0),  // Arrow points up by default
+  direction
+);
+
+cursor.mesh.quaternion.slerp(targetQuaternion, slerpFactor);
+```
+
+The `slerpFactor` calculation ensures smooth rotation without sudden jumps, with each cursor having a randomized rotation speed for visual variety.
+
+### Adding variance
+
+To make the background visually interesting, I added several layers of variance:
+
+#### Color variation
+
+Each cursor receives a randomly generated color using HSL color space. Using HSL over RGB provides more intuitive control over saturation, ensuring cursors can have a light accent without distracting from the site's content.
+Only a configurable percentage of cursors receive colored hues while the rest remain grayscale:
+
+```javascript
+function generateCursorColor(theme) {
+  const hue = Math.random();
+  const isColored = Math.random() < CONFIG.cursors.coloredPercent; // 25%
+  const saturation = isColored ? getRandomSaturation() : 0;
+  // .. 
+  return new THREE.Color().setHSL(hue, saturation, baseLightness);
+}
+```
+
+#### Theme awareness
+
+The colors adapt when the user switches between dark and light themes. A `MutationObserver` watches for changes to the `data-theme` attribute:
+
+```javascript
+const observer = new MutationObserver((mutations) => {
+  mutations.forEach((mutation) => {
+    if (mutation.attributeName === "data-theme") {
+      updateThemeColors();
+    }
+  });
+});
+observer.observe(document.documentElement, { attributes: true });
+```
+
+The `updateThemeColors` function recalculates each cursor's lightness value while preserving its hue and saturation, allowing for dark cursors on light backgrounds and light cursors on dark backgrounds.
+
+#### Movement variance
+
+Each cursor has randomized properties for organic movement including phase offset for sine wave oscillation, rotation speed, and parallax speed based on its depth. This allows cursors to move organically in the background as users navigate the site, rather than remaining static fixtures.
+
+### Wave displacement effect
+
+I implemented a wave displacement system that pushes cursors away from the mouse when it moves, resulting in a satisfying ripple effect during fast mouse movements.
+
+Cursors within a certain radius of the mouse receive displacement force:
+
+```javascript
+if (distance < CONFIG.interaction.waveRadius) {
+  const force = CONFIG.interaction.waveStrength *
+    mouseVel *
+    (1 - distance / CONFIG.interaction.waveRadius);
+
+  const angle = Math.atan2(dy, dx);
+  cursor.waveDisplacement.x -= Math.cos(angle) * force;
+  cursor.waveDisplacement.y -= Math.sin(angle) * force;
+}
+```
+
+The displacement decays over time to create a smooth return animation.
+
+### Scrolling parallax
+
+To add depth perception, cursors at different Z positions move at different speeds during scrolling. This creates a parallax effect where foreground elements appear to move faster than background elements.
+
+With cursors distributed across a depth range from -5 to 5 on the Z-axis, the parallax speed is calculated based on each cursor's position:
+
+```javascript
+function getParallaxSpeed(z) {
+  const normalizedZ = (z - zMin) / (zMax - zMin);
+  return minSpeed + normalizedZ * (maxSpeed - minSpeed);
+}
+```
+
+When cursors scroll out of view, they respawn on the opposite side to create an infinite field effect.
+
+### Making it work seamlessly across pages
+
+Since this site is built using Astro, the Canvas used by Three.js is typically scoped to the current page. Without special handling, navigating to a different page would reset the background effect, creating a jarring transition.
+
+Astro's View Transitions API solves this problem elegantly. By adding `transition:persist` to the canvas element, the same DOM node persists across page navigations:
+
+```astro
+<canvas id="three-bg" transition:persist data-config={configJson}></canvas>
+```
+
+To prevent re-initialization of the Three.js scene during navigation, I added a guard check at the start of the script:
+
+```javascript
+if (window.__threeBgRenderer) {
+  return; // Already initialized
+}
+window.__threeBgRenderer = ...;
+```
+
+This ensures the animation continues smoothly across page transitions without any visible interruption.
+
+### Animation toggle
+
+For accessibility and user preference, I implemented an animation toggle that allows visitors to pause the background animation. This respects the `prefers-reduced-motion` media query by default.
+
+The toggle state is stored in `sessionStorage` and reflected via a `data-animation` attribute on the document element. In the animation loop, the function returns early if the animation is paused.
+
+When animation is resumed, the loop restarts automatically via a `MutationObserver` that watches the `data-animation` attribute.
+
+### Keeping the content clear
+
+To ensure the background doesn't interfere with content readability, I applied a blur effect to the main content container using `backdrop-filter`. This creates a frosted glass effect that keeps the animated background visible while ensuring text remains legible:
+
+```css
+main > main {
+  background: rgba(21, 21, 21, 0.08);
+  backdrop-filter: blur(10px);
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+```
+
+This approach provides a semi-transparent container with blur that separates the content from the dynamic background while maintaining visual cohesion.
+
+## Conclusion
+
+I had fun creating this interactive background—there was always something new to tweak, from adding cursor variance and ripple effects to implementing scrolling support and ensuring everything remained accessible and elegant.
+
+I'm pleased with the final result: it remains a complementary background element while the site stays centered on its content.
+
+You can see the final result by moving your mouse around this page and scrolling through the content. The full implementation is available in my site's [github source](https://github.com/AntonyGarand/garand.dev).

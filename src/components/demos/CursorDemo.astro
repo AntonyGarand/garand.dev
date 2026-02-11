@@ -1,0 +1,162 @@
+---
+/**
+ * CursorDemo Component
+ *
+ * Interactive demo showcasing the different cursor types used in the site background.
+ * Uses the actual Three.js geometries from cursorGeometry.ts for accurate representation.
+ *
+ * @component
+ */
+
+interface Props {
+  /** Type of cursor to display */
+  type?: "outline" | "mesh" | "plane" | "plain";
+  /** Size of the canvas in pixels */
+  size?: number;
+}
+
+const { type = "outline", size = 100 } = Astro.props;
+const canvasId = `cursor-demo-${type}-${Math.random().toString(36).slice(2, 9)}`;
+---
+
+<div class="cursor-demo" data-type={type} data-canvas-id={canvasId}>
+  <canvas id={canvasId} width={size} height={size}></canvas>
+  <p class="cursor-label">{type}</p>
+</div>
+
+<style>
+  .cursor-demo {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 1rem;
+    padding-top: 1.5rem;
+    border-radius: var(--border-radius-md);
+    background: var(--color-bg-secondary);
+    border: 1px solid var(--color-border);
+    transition: transform 0.2s ease;
+  }
+  .cursor-demo:hover {
+    transform: scale(1.05);
+  }
+  .cursor-demo canvas {
+    display: block;
+  }
+  .cursor-label {
+    margin-top: 0.5rem;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--color-text-secondary);
+    font-family: ui-monospace, monospace;
+  }
+</style>
+
+<script>
+  import * as THREE from "three";
+  import {
+    CursorType,
+    create3DArrowGeometry,
+    create2DArrowOutlineGeometry,
+    createCursorMesh,
+  } from "../../utils/cursorGeometry";
+
+  // Map type strings to CursorType enum
+  const cursorTypeMap: Record<string, CursorType> = {
+    outline: CursorType.Outline,
+    mesh: CursorType.Mesh,
+    plane: CursorType.Plane,
+    plain: CursorType.Plain,
+  };
+
+  // Initialize all cursor demos on the page
+  document.querySelectorAll(".cursor-demo").forEach((demo) => {
+    const canvasId = (demo as HTMLElement).dataset.canvasId;
+    const type = (demo as HTMLElement).dataset.type || "outline";
+    const canvas = document.getElementById(canvasId!) as HTMLCanvasElement;
+
+    if (!canvas) return;
+
+    // Scene setup
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 100);
+    // Position camera at an angle to show 3D depth
+    camera.position.set(0.8, 0.6, 1.2);
+    camera.lookAt(0, 0, 0);
+
+    const renderer = new THREE.WebGLRenderer({
+      canvas,
+      alpha: true,
+      antialias: true,
+    });
+    renderer.setSize(100, 100);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+    // Get theme color
+    const isDark =
+      !document.documentElement.getAttribute("data-theme") ||
+      document.documentElement.getAttribute("data-theme") === "dark";
+    const color = new THREE.Color(isDark ? 0x808080 : 0x606060);
+
+    // Create geometries
+    const arrow3DGeometry = create3DArrowGeometry();
+    const arrow2DOutlineGeometry = create2DArrowOutlineGeometry();
+
+    // Create cursor mesh
+    const cursorType = cursorTypeMap[type];
+    const cursor = createCursorMesh(
+      cursorType,
+      color,
+      arrow3DGeometry,
+      arrow2DOutlineGeometry
+    );
+    // Scale up for better visibility in demo
+    cursor.scale.set(2.5, 2.5, 2.5);
+    scene.add(cursor);
+
+    // Target quaternion for 3D rotation with delay
+    let targetQuaternion = new THREE.Quaternion();
+    // Random lerp speed for delay effect (0.02 to 0.1)
+    const rotationLerpSpeed = 0.02 + Math.random() * 0.08;
+
+    // Animation loop
+    let animationId: number;
+
+    function animate() {
+      animationId = requestAnimationFrame(animate);
+      
+      // Smoothly interpolate rotation toward target with delay (slerp for quaternions)
+      cursor.quaternion.slerp(targetQuaternion, rotationLerpSpeed);
+      
+      renderer.render(scene, camera);
+    }
+
+    // Mouse interaction for rotation
+    demo.addEventListener("mousemove", (e) => {
+      const rect = demo.getBoundingClientRect();
+      const centerX = rect.left + rect.width / 2;
+      const centerY = rect.top + rect.height / 2;
+      const mouseX = (e as MouseEvent).clientX - centerX;
+      const mouseY = (e as MouseEvent).clientY - centerY;
+      
+      // Calculate direction to cursor (arrow points TO cursor)
+      // Z component adds 3D depth effect - arrow tilts toward viewer
+      const direction = new THREE.Vector3(mouseX, -mouseY, 30).normalize();
+      
+      // Create quaternion that points arrow toward cursor
+      // Arrow points up (+Y) by default, so we rotate from up to direction
+      targetQuaternion = new THREE.Quaternion().setFromUnitVectors(
+        new THREE.Vector3(0, 1, 0),
+        direction
+      );
+    });
+
+    animate();
+
+    // Cleanup on navigation
+    document.addEventListener("astro:before-swap", () => {
+      cancelAnimationFrame(animationId);
+      renderer.dispose();
+    });
+  });
+</script>

@@ -209,7 +209,7 @@ const configJson = encodeURIComponent(JSON.stringify(config));
       originalPosition: THREE.Vector3;
       velocity: THREE.Vector3;
       phase: number;
-      rotationSpeed: number;
+      rotationLerpSpeed: number;
       parallaxSpeed: number;
       colorData: ColorData;
       waveDisplacement: THREE.Vector3;
@@ -549,11 +549,9 @@ const configJson = encodeURIComponent(JSON.stringify(config));
       );
 
       const phase = Math.random() * Math.PI * 2;
-      const rotationSpeed =
-        CONFIG.animation.rotationSpeedRange.min +
-        Math.random() *
-          (CONFIG.animation.rotationSpeedRange.max -
-            CONFIG.animation.rotationSpeedRange.min);
+      // Use slow lerp speed for delay effect (0.01 to 0.05)
+      // Lower values = more delay (0.1 to 1 second to reach target)
+      const rotationLerpSpeed = 0.01 + Math.random() * 0.04;
 
       const parallaxSpeed = getParallaxSpeed(z);
 
@@ -567,7 +565,7 @@ const configJson = encodeURIComponent(JSON.stringify(config));
         originalPosition: position.clone(),
         velocity,
         phase,
-        rotationSpeed,
+        rotationLerpSpeed,
         parallaxSpeed,
         colorData: { hue, saturation, baseLightness },
         waveDisplacement: new THREE.Vector3(0, 0, 0),
@@ -577,27 +575,39 @@ const configJson = encodeURIComponent(JSON.stringify(config));
 
     /**
      * Respawns a cursor at the edge when it goes out of bounds
+     * Accounts for parallax offset to ensure smooth infinite scrolling
      */
-    function respawnCursor(cursor: CursorData, screenBounds: ScreenBounds) {
-      const outTop = cursor.position.y > screenBounds.top;
-      const outBottom = cursor.position.y < screenBounds.bottom;
+    function respawnCursor(
+      cursor: CursorData,
+      screenBounds: ScreenBounds,
+      currentScrollY: number,
+    ) {
+      // Calculate the parallax offset for this cursor
+      const parallaxOffset = currentScrollY * cursor.parallaxSpeed;
+      const renderedY = cursor.position.y + parallaxOffset;
+
+      // Check if rendered position is out of bounds
+      const outTop = renderedY > screenBounds.top;
+      const outBottom = renderedY < screenBounds.bottom;
       const outLeft = cursor.position.x < screenBounds.left;
       const outRight = cursor.position.x > screenBounds.right;
 
       if (outTop) {
-        cursor.position.y = screenBounds.bottom;
-        cursor.originalPosition.y = screenBounds.bottom;
+        // Move to bottom, accounting for parallax
+        cursor.position.y = screenBounds.bottom - parallaxOffset + 0.5;
+        cursor.originalPosition.y = cursor.position.y;
       } else if (outBottom) {
-        cursor.position.y = screenBounds.top;
-        cursor.originalPosition.y = screenBounds.top;
+        // Move to top, accounting for parallax
+        cursor.position.y = screenBounds.top - parallaxOffset - 0.5;
+        cursor.originalPosition.y = cursor.position.y;
       }
 
       if (outLeft) {
-        cursor.position.x = screenBounds.right;
-        cursor.originalPosition.x = screenBounds.right;
+        cursor.position.x = screenBounds.right - 0.5;
+        cursor.originalPosition.x = cursor.position.x;
       } else if (outRight) {
-        cursor.position.x = screenBounds.left;
-        cursor.originalPosition.x = screenBounds.left;
+        cursor.position.x = screenBounds.left + 0.5;
+        cursor.originalPosition.x = cursor.position.x;
       }
     }
 
@@ -742,7 +752,6 @@ const configJson = encodeURIComponent(JSON.stringify(config));
     // Animation Loop
 
     const startTime = performance.now();
-    let lastFrameTime = startTime;
 
     function animate() {
       // Skip animation loop if animation is paused
@@ -753,8 +762,6 @@ const configJson = encodeURIComponent(JSON.stringify(config));
       requestAnimationFrame(animate);
 
       const currentTime = performance.now();
-      const deltaTime = (currentTime - lastFrameTime) * 0.001;
-      lastFrameTime = currentTime;
       const elapsed = (currentTime - startTime) * 0.001;
 
       // Calculate screen bounds in world space
@@ -839,7 +846,7 @@ const configJson = encodeURIComponent(JSON.stringify(config));
           cursor.position.x < screenBounds.left ||
           cursor.position.x > screenBounds.right
         ) {
-          respawnCursor(cursor, screenBounds);
+          respawnCursor(cursor, screenBounds, scrollY);
         }
 
         // Update mesh position
@@ -865,13 +872,8 @@ const configJson = encodeURIComponent(JSON.stringify(config));
           direction,
         );
 
-        const dot = cursor.mesh.quaternion.dot(targetQuaternion);
-        const angle = 2 * Math.acos(Math.min(Math.abs(dot), 1));
-        const maxRotation =
-          ((2 * Math.PI) / cursor.rotationSpeed) * deltaTime;
-        const slerpFactor = Math.min(maxRotation / angle, 1);
-
-        cursor.mesh.quaternion.slerp(targetQuaternion, slerpFactor);
+        // Use simple slerp with rotationLerpSpeed for smooth delay effect
+        cursor.mesh.quaternion.slerp(targetQuaternion, cursor.rotationLerpSpeed);
       });
 
       // Decay velocities
