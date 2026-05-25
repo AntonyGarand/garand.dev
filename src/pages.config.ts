@@ -108,17 +108,6 @@ export const pagesConfig = {
 	},
 
 	/**
-	 * Notes listing page (/notes)
-	 */
-	notes: {
-		title: "Notes - Quick thoughts and snippets",
-		description:
-			"Short notes and quick thoughts about interesting discoveries.",
-		heading: "Notes",
-		intro: "Quick notes and thoughts on things I find interesting.",
-	},
-
-	/**
 	 * Speaking engagements page (/speaking)
 	 */
 	speaking: {

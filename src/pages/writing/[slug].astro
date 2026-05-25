@@ -40,7 +40,7 @@ import { getReadingTime } from '../../utils/readingTime';
  */
 export async function getStaticPaths() {
   const articles = await getCollection('writing', ({ data }) => {
-    return data.draft === false && data.type.includes('post');
+    return data.draft === false;
   });
   return articles.map((article) => ({
     params: { slug: article.id },
