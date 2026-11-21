@@ -50,9 +50,12 @@ interface Props {
   
   /** Project status (default: 'completed') */
   status?: 'completed' | 'ongoing' | 'archived';
+
+  /** Optional preview image shown on the right of the card */
+  cover?: string;
 }
 
-const { title, slug, outcomeSummary, role, year, techStack = [], featured = false, status = 'completed' } = Astro.props;
+const { title, slug, outcomeSummary, role, year, techStack = [], featured = false, status = 'completed', cover } = Astro.props;
 
 // Show max 4 tech tags to keep card clean and consistent
 const displayTech = techStack.slice(0, 4);
@@ -100,6 +103,10 @@ const statusInfo = statusConfig[status];
   )}
   
   <ForwardLink text="View case study" />
+
+  {cover && (
+    <img slot="media" src={cover} alt="" width="1280" height="800" loading="lazy" decoding="async" />
+  )}
 </BaseCard>
 
 <style>

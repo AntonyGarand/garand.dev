@@ -81,6 +81,14 @@ const projectsCollection = defineCollection({
 		/** Technologies and frameworks used */
 		techStack: z.array(z.string()),
 
+		/** Preview image shown on the projects list (path under /public) */
+		cover: z.string().optional(),
+
+		/** Screenshots shown on the project page */
+		screenshots: z
+			.array(z.object({ src: z.string(), alt: z.string(), caption: z.string().optional() }))
+			.optional(),
+
 		/** Project impact and results */
 		impact: z.object({
 			/** Quantitative metrics (optional) */

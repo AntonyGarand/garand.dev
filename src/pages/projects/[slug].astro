@@ -92,6 +92,7 @@ const {
   relatedDecisions,
   status,
   links,
+  screenshots,
 } = project.data;
 
 // Status display configuration
@@ -193,6 +194,23 @@ const readingTime = formatReadingTime(calculateReadingTime(allText));
       <h2>Overview</h2>
       <p>{overview}</p>
     </section>
+
+    <!-- Screenshots -->
+    {screenshots && screenshots.length > 0 && (
+      <section class="case-study-section">
+        <h2>Screenshots</h2>
+        <div class="screenshots">
+          {screenshots.map((shot) => (
+            <figure class="screenshot">
+              <a href={shot.src} target="_blank" rel="noopener">
+                <img src={shot.src} alt={shot.alt} loading="lazy" decoding="async" />
+              </a>
+              {shot.caption && <figcaption>{shot.caption}</figcaption>}
+            </figure>
+          ))}
+        </div>
+      </section>
+    )}
 
     <!-- Problem Section -->
     <section class="case-study-section">
@@ -384,6 +402,40 @@ const readingTime = formatReadingTime(calculateReadingTime(allText));
 
     .case-study-section {
       margin-bottom: 3rem;
+    }
+
+    .screenshots {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+      align-items: flex-start;
+    }
+
+    .screenshot {
+      margin: 0;
+      flex: 1 1 100%;
+    }
+
+    .screenshot a {
+      display: block;
+      border: 1px solid var(--color-border);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .screenshot img {
+      display: block;
+      width: 100%;
+      height: auto;
+      max-height: 32rem;
+      object-fit: contain;
+      background: var(--color-bg-secondary);
+    }
+
+    .screenshot figcaption {
+      margin-top: 0.5rem;
+      font-size: 0.875rem;
+      color: var(--color-text-muted);
     }
 
     .case-study-section h2 {
