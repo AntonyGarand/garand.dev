@@ -105,6 +105,14 @@ const projectsCollection = defineCollection({
 		/** Project status */
 		status: z.enum(["completed", "ongoing", "archived"]).default("completed"),
 
+		/** External links: hosted site and source repository */
+		links: z
+			.object({
+				live: z.string().url().optional(),
+				github: z.string().url().optional(),
+			})
+			.optional(),
+
 		/** Custom sort order (lower numbers first) */
 		order: z.number().optional(),
 

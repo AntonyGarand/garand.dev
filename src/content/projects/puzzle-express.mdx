@@ -1,0 +1,44 @@
+---
+title: "Puzzle Express"
+role: "Creator"
+year: 2026
+status: "ongoing"
+links:
+  live: "https://puzzle.garand.dev"
+  github: "https://github.com/AntonyGarand/puzzle-express"
+outcomeSummary: "An endless feed of puzzles so you can doomscroll something more productive. Ad-free, open source, local-first, and with 53 procedurally generated puzzles for an endless feed of fun!"
+overview: "Puzzle Express is a feed of short puzzles you scroll through like a social feed: Sudoku, Nonograms, Bridges, FreeCell, mate-in-two chess, word games and more. Every puzzle is generated from a seed, so there's always a next one, and the daily set is the same for everyone."
+problem: "Puzzle apps tend to do one game, push ads, or require an account. I wanted one place with a wide variety of quick puzzles that adapts to your level, keeps your progress without a backend, and runs anywhere."
+constraints:
+  - "Static site only: no server, no accounts; profile, stats and unfinished games live in localStorage"
+  - "Every game generated on the fly from a seed, fast enough to keep the feed instant"
+  - "Fully playable offline and installable on mobile"
+  - "Bilingual (English and Québec French), including the word games' dictionaries"
+approach: "A plain TypeScript app built with Vite, one file per game, auto-registered into the feed. Shared engines (sudokukit, logickit, pathkit, movekit, cardkit, chesskit, wordkit) carry most of the logic, so a new game is mostly its rules and its generator. Each game has five difficulty levels and the feed auto-levels based on how you do."
+keyDecisions:
+  - decision: "Seeded generation instead of puzzle packs"
+    reasoning: "A seed is a whole puzzle: it gives an infinite feed, a shared daily puzzle and shareable links without storing or serving any puzzle data."
+    alternatives:
+      - "Curated puzzle packs"
+      - "A backend serving puzzles"
+  - decision: "No UI framework, shared game kits instead"
+    reasoning: "The games are mostly grid rendering with their own input handling. Small shared kits per family of games gave more reuse than a component framework would, and kept the bundle small for offline use."
+techStack:
+  - "TypeScript"
+  - "Vite"
+  - "PWA (vite-plugin-pwa)"
+  - "Vitest"
+  - "Playwright"
+  - "oxlint & oxfmt"
+  - "GitHub Pages"
+impact:
+  metrics:
+    - label: "Games"
+      value: "53, in 7 categories"
+    - label: "Difficulty levels"
+      value: "5 per game, with auto-levelling"
+  qualitative: "A free, ad-free puzzle feed that works offline on any device, with a daily set and shareable puzzles."
+learnings:
+  - "Writing generators that guarantee a unique solution is the hard part of most logic puzzles; the UI is the easy part."
+  - "Automated screenshot runs of every game at every level catch layout regressions that unit tests never would."
+---

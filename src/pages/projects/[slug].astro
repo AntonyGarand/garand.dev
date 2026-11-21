@@ -91,6 +91,7 @@ const {
   relatedProjects,
   relatedDecisions,
   status,
+  links,
 } = project.data;
 
 // Status display configuration
@@ -171,6 +172,20 @@ const readingTime = formatReadingTime(calculateReadingTime(allText));
         <span class="meta-item">{readingTime}</span>
       </div>
       <p class="outcome-summary">{outcomeSummary}</p>
+      {links && (links.live || links.github) && (
+        <div class="project-links">
+          {links.live && (
+            <a href={links.live} target="_blank" rel="noopener">
+              {new URL(links.live).host} ↗
+            </a>
+          )}
+          {links.github && (
+            <a href={links.github} target="_blank" rel="noopener">
+              GitHub ↗
+            </a>
+          )}
+        </div>
+      )}
     </header>
 
     <!-- Overview Section -->
@@ -344,6 +359,27 @@ const readingTime = formatReadingTime(calculateReadingTime(allText));
       font-size: 1.125rem;
       line-height: 1.6;
       color: var(--color-text-secondary);
+    }
+
+    .project-links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      margin-top: 1.25rem;
+    }
+
+    .project-links a {
+      font-size: 0.9375rem;
+      font-weight: 600;
+      padding: 0.4rem 0.85rem;
+      border: 1px solid var(--color-border);
+      border-radius: 6px;
+      color: var(--color-accent);
+      text-decoration: none;
+    }
+
+    .project-links a:hover {
+      border-color: var(--color-accent);
     }
 
     .case-study-section {

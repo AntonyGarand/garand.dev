@@ -1,0 +1,40 @@
+---
+title: "HJKL Quest"
+role: "Creator"
+year: 2026
+status: "ongoing"
+links:
+  live: "https://vim.garand.dev"
+  github: "https://github.com/AntonyGarand/hjkl-quest"
+outcomeSummary: "My take on a vim learning adventure, based off a rust project: Gamified learning with a full fledged vim emulator and wide variety of golfable levels for users to learn."
+overview: "In HJKL Quest the world is the buffer: every character is a tile, the cursor is a wisp, and every command moves you or reshapes the land exactly as it would in vim. Fifty-seven isles across eighteen chapters take you from hjkl to macros, :g and pattern groups, with bosses, a daily puzzle and vim golf."
+problem: "vimtutor teaches the commands but not the habits, and most people stop at hjkl. Learning vim needs repetition and feedback on what you could have typed instead."
+constraints:
+  - "Behave exactly like vim, down to motions, text objects, registers, marks, macros and :s patterns"
+  - "One code base for the web (WebAssembly) and native desktop apps"
+  - "Playable on phones and tablets, with an on-screen bar for Esc, Ctrl, Tab and :"
+approach: "A self-contained vim emulator in Rust drives everything: the levels, the lesson animations, the habit coach and the golf checks all run on the same engine. Each isle unlocks a few keys and refuses the rest, a coach names the faster command you already know, and every isle has a par from a known short solution."
+keyDecisions:
+  - decision: "Native Shell (nsh) for UI and packaging"
+    reasoning: "The same Rust crate runs as a web app and as native apps on Windows, macOS and Linux, without maintaining a separate front end."
+    alternatives:
+      - "A TypeScript web app"
+      - "A game engine such as Bevy"
+  - decision: "Write a vim emulator instead of embedding one"
+    reasoning: "The game needs to lock keys, watch every command, and replay solutions headlessly in tests. An engine built for that made the coach, hints and grammar tracking straightforward, and tests replay every golf solution to check it clears its isle at exactly par."
+techStack:
+  - "Rust"
+  - "Native Shell (nsh)"
+  - "WebAssembly"
+  - "GitHub Pages"
+impact:
+  metrics:
+    - label: "Isles"
+      value: "57 in 18 chapters"
+    - label: "vimtutor coverage"
+      value: "Every command from all 7 lessons"
+  qualitative: "A free way to learn vim from the first keystroke to macros and ex commands, with feedback on habits rather than just right or wrong."
+learnings:
+  - "Vim's edge cases (counts, dot-repeat, undo boundaries) are where an emulator gets hard."
+  - "Testing a game through its own engine, replaying every intended solution, catches level design bugs early."
+---
