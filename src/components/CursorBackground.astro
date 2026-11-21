@@ -156,11 +156,15 @@ const configJson = encodeURIComponent(JSON.stringify(config));
     z-index: -1;
     pointer-events: none;
     background: radial-gradient(
-      ellipse 80% 60% at center,
-      rgba(var(--color-bg-rgb), 0.7) 0%,
-      rgba(var(--color-bg-rgb), 0.2) 50%,
+      ellipse 45% 70% at center,
+      rgba(var(--color-bg-rgb), 0.85) 0%,
+      rgba(var(--color-bg-rgb), 0.45) 60%,
       transparent 100%
     );
+  }
+
+  :global([data-theme="light"]) #three-bg {
+    opacity: 0.55;
   }
 
   @media (prefers-reduced-motion: reduce) {

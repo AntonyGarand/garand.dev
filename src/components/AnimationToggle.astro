@@ -24,8 +24,8 @@
 <button
   class="animation-toggle"
   type="button"
-  aria-label="Toggle animation"
-  title="Toggle animation"
+  aria-label="Pause background animation"
+  title="Pause background animation"
 >
   <svg
     class="icon icon-pause"
@@ -119,6 +119,17 @@
   const setAnimationState = (state: AnimationState) => {
     document.documentElement.setAttribute("data-animation", state);
     sessionStorage.setItem("animation", state);
+    syncLabel();
+  };
+
+  const syncLabel = () => {
+    const paused =
+      document.documentElement.getAttribute("data-animation") === AnimationState.Paused;
+    const label = paused ? "Play background animation" : "Pause background animation";
+    document.querySelectorAll(".animation-toggle").forEach((b) => {
+      b.setAttribute("aria-label", label);
+      b.setAttribute("title", label);
+    });
   };
   const setInitialState = () => {
     if (!document.documentElement.getAttribute("data-animation")) {
@@ -145,5 +156,6 @@
 
   document.addEventListener("astro:page-load", () => {
     setInitialState();
+    syncLabel();
   });
 </script>

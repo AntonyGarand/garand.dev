@@ -135,11 +135,12 @@ import "../styles/utilities.css";
     </style>
   </head>
   <body>
+    <a class="skip-link" href="#main-content">Skip to content</a>
     <CursorBackground />
     <header class="site-header" transition:persist>
       <Navigation />
     </header>
-    <main>
+    <main id="main-content" tabindex="-1">
       <slot />
     </main>
     <Footer />

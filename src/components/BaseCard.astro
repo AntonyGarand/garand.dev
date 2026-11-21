@@ -69,6 +69,12 @@ const hasMedia = Astro.slots.has('media');
     transition: border-color 0.2s ease, background 0.2s ease;
   }
 
+  .base-card:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 3px;
+    border-color: var(--color-accent);
+  }
+
   .base-card:hover {
     border-color: var(--color-text-muted);
     background: var(--color-bg-elevated);
@@ -110,10 +116,10 @@ const hasMedia = Astro.slots.has('media');
 
   .card-meta {
     display: block;
-    font-size: 0.6875rem;
+    font-size: 0.75rem;
     font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.06em;
     color: var(--color-text-muted);
     margin-bottom: 0.5rem;
   }

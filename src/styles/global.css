@@ -8,13 +8,16 @@
    --color-bg-elevated: #1a1a1a;
    --color-text: #e5e5e5;
    --color-text-secondary: #a3a3a3;
-   --color-text-muted: #737373;
+   --color-text-body: #d4d4d4;
+   --color-text-muted: #8a8a8a;
    --color-border: #262626;
    --color-border-subtle: #1f1f1f;
    --color-accent: #3b82f6;
    --color-accent-hover: #60a5fa;
    --color-accent-muted: rgba(59, 130, 246, 0.15);
    --color-accent-glow: rgba(59, 130, 246, 0.25);
+   --color-success: #22c55e;
+   --color-success-bg: rgba(34, 197, 94, 0.15);
   
   /* Gradient Colors */
   --gradient-text: linear-gradient(135deg, #e5e5e5 0%, #a3a3a3 100%);
@@ -81,13 +84,16 @@
    --color-bg-elevated: #fafafa;
    --color-text: #171717;
    --color-text-secondary: #525252;
-   --color-text-muted: #a3a3a3;
+   --color-text-body: #262626;
+   --color-text-muted: #6b6b6b;
    --color-border: #e5e5e5;
    --color-border-subtle: #f0f0f0;
    --color-accent: #2563eb;
    --color-accent-hover: #1d4ed8;
    --color-accent-muted: rgba(37, 99, 235, 0.1);
    --color-accent-glow: rgba(37, 99, 235, 0.15);
+   --color-success: #166534;
+   --color-success-bg: rgba(22, 101, 52, 0.12);
   
   /* Light mode gradients */
   --gradient-text: linear-gradient(135deg, #171717 0%, #525252 100%);
@@ -197,4 +203,24 @@ pre code {
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border-width: 0;
+}
+
+/* Skip link: hidden until focused with the keyboard */
+.skip-link {
+  position: absolute;
+  top: 0.5rem;
+  left: 0.5rem;
+  z-index: 1000;
+  padding: 0.5rem 1rem;
+  background: var(--color-accent);
+  color: #fff;
+  font-weight: 600;
+  border-radius: var(--border-radius-sm);
+  transform: translateY(-200%);
+  transition: transform var(--transition-fast);
+}
+
+.skip-link:focus-visible {
+  transform: translateY(0);
+  color: #fff;
 }

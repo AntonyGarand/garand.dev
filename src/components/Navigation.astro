@@ -109,8 +109,8 @@ const isActive = (href: string) => {
     border-bottom: 1px solid var(--color-border);
     padding: var(--space-md) 0;
     margin-bottom: var(--space-md);
-    background: rgba(21, 21, 21, 0.03);
-    backdrop-filter: blur(5px);
+    background: rgba(var(--color-bg-rgb), 0.75);
+    backdrop-filter: blur(8px);
   }
 
   .nav-scroll {
@@ -183,14 +183,27 @@ const isActive = (href: string) => {
   }
 
   @media (max-width: 768px) {
+    .site-nav {
+      padding: var(--space-sm) 0;
+    }
+
+    .nav-scroll {
+      overflow: visible;
+    }
+
     .nav-list {
-      justify-content: flex-start;
-      gap: 1.5rem;
-      padding: 0.5rem 1rem;
+      min-width: 0;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 0.25rem 1.25rem;
+      padding: 0.25rem 0.75rem;
     }
 
     .nav-link {
-      font-size: 0.75rem;
+      display: inline-block;
+      padding: 0.5rem 0;
+      font-size: 0.8125rem;
+      letter-spacing: 0.03em;
     }
 
     .nav-end {
@@ -198,8 +211,7 @@ const isActive = (href: string) => {
     }
 
     .nav-end::before {
-      left: -16px;
-      width: 16px;
+      display: none;
     }
   }
 </style>

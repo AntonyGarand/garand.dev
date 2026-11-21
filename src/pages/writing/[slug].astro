@@ -218,8 +218,10 @@ function formatDate(date: Date): string {
       font-size: 1.125rem;
       line-height: 1.7;
       color: var(--color-text);
+      max-width: 68ch;
     }
 
+    .article-content :global(h1),
     .article-content :global(h2) {
       font-size: 1.75rem;
       margin-top: 2.5rem;
@@ -251,14 +253,14 @@ function formatDate(date: Date): string {
 
     .article-content :global(p) {
       margin-bottom: 1.5rem;
-      color: var(--color-text-secondary);
+      color: var(--color-text-body);
     }
 
     .article-content :global(ul),
     .article-content :global(ol) {
       margin-bottom: 1.5rem;
       padding-left: 1.5rem;
-      color: var(--color-text-secondary);
+      color: var(--color-text-body);
     }
 
     .article-content :global(li) {
@@ -270,9 +272,14 @@ function formatDate(date: Date): string {
       margin: 2rem 0;
       padding: 1rem 1.5rem;
       border-left: 4px solid var(--color-accent);
-      background: var(--color-bg-secondary);
-      font-style: italic;
-      color: var(--color-text-secondary);
+      border-radius: 0 6px 6px 0;
+      background: var(--color-bg-elevated);
+      color: var(--color-text);
+      font-style: normal;
+    }
+
+    .article-content :global(blockquote p:last-child) {
+      margin-bottom: 0;
     }
 
     .article-content :global(code) {
