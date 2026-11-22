@@ -3,11 +3,11 @@
  * AnimationToggle Component
  *
  * Interactive button that toggles between animated and static background.
- * Persists user preference to sessionStorage and respects system reduced-motion preference.
+ * Persists user preference to localStorage and respects system reduced-motion preference.
  * Displays play icon when animation is paused, pause icon when animation is running.
  *
  * Features:
- * - Persists animation preference to sessionStorage
+ * - Persists animation preference to localStorage
  * - Respects system reduced-motion preference (prefers-reduced-motion)
  * - Works with Astro View Transitions via event delegation
  * - Accessible with keyboard focus and ARIA labels
@@ -106,7 +106,7 @@
   import { AnimationState } from "../types/Common";
   // Get animation state from storage or system preference
   const getAnimationState = (): AnimationState => {
-    const stored = sessionStorage.getItem("animation");
+    const stored = localStorage.getItem("animation");
     if (stored === AnimationState.Running || stored === AnimationState.Paused) {
       return stored as AnimationState;
     }
@@ -118,7 +118,7 @@
 
   const setAnimationState = (state: AnimationState) => {
     document.documentElement.setAttribute("data-animation", state);
-    sessionStorage.setItem("animation", state);
+    localStorage.setItem("animation", state);
     syncLabel();
   };
 

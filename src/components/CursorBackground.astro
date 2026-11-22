@@ -652,10 +652,12 @@ const configJson = encodeURIComponent(JSON.stringify(config));
         }
         if (mutation.attributeName === 'data-animation') {
           if (getAnimationState()) {
-            // Animation resumed - start the loop
-            animate();
-          } else {
-            // Animation paused - will stop on next frame
+            // Animation resumed - start the loop unless one is already running
+            if (frameId === null) animate();
+          } else if (frameId !== null) {
+            // Animation paused - stop immediately
+            cancelAnimationFrame(frameId);
+            frameId = null;
           }
         }
       });
@@ -757,13 +759,19 @@ const configJson = encodeURIComponent(JSON.stringify(config));
 
     const startTime = performance.now();
 
+    // Only one frame may be scheduled at a time. Without this guard, every
+    // data-animation mutation (toggle, View Transition swap) started an extra
+    // loop, so the animation sped up after each navigation.
+    let frameId: number | null = null;
+
     function animate() {
-      // Skip animation loop if animation is paused
+      frameId = null;
+      // Stop the loop if animation is paused
       if (!getAnimationState()) {
         return;
       }
 
-      requestAnimationFrame(animate);
+      frameId = requestAnimationFrame(animate);
 
       const currentTime = performance.now();
       const elapsed = (currentTime - startTime) * 0.001;

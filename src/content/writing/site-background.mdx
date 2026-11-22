@@ -215,7 +215,7 @@ This ensures the animation continues smoothly across page transitions without an
 
 For accessibility and user preference, I implemented an animation toggle that allows visitors to pause the background animation. This respects the `prefers-reduced-motion` media query by default.
 
-The toggle state is stored in `sessionStorage` and reflected via a `data-animation` attribute on the document element. In the animation loop, the function returns early if the animation is paused.
+The toggle state is stored in `localStorage` and reflected via a `data-animation` attribute on the document element. In the animation loop, the function returns early if the animation is paused.
 
 When animation is resumed, the loop restarts automatically via a `MutationObserver` that watches the `data-animation` attribute.
 

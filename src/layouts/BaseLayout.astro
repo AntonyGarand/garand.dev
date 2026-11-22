@@ -104,14 +104,27 @@ import "../styles/utilities.css";
             ? "light"
             : "dark");
         document.documentElement.setAttribute("data-theme", theme);
+
+        const animation = localStorage.getItem("animation");
+        document.documentElement.setAttribute(
+          "data-animation",
+          animation === "running" || animation === "paused"
+            ? animation
+            : window.matchMedia("(prefers-reduced-motion: reduce)").matches
+              ? "paused"
+              : "running",
+        );
       })();
     </script>
 
-    <!-- Preserve theme during View Transitions -->
+    <!-- Preserve theme and animation state during View Transitions -->
     <script is:inline>
       document.addEventListener("astro:before-swap", (e) => {
-        const theme = document.documentElement.getAttribute("data-theme");
-        e.newDocument.documentElement.setAttribute("data-theme", theme);
+        const root = document.documentElement;
+        const next = e.newDocument.documentElement;
+        next.setAttribute("data-theme", root.getAttribute("data-theme"));
+        const animation = root.getAttribute("data-animation");
+        if (animation) next.setAttribute("data-animation", animation);
       });
     </script>
 
