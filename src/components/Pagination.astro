@@ -35,9 +35,12 @@ interface Props {
   
   /** Base URL for pagination links (e.g., "/writing") */
   baseUrl: string;
+
+  /** Use ?page=N links instead of /base/N paths */
+  queryParam?: boolean;
 }
 
-const { currentPage, totalPages, baseUrl } = Astro.props;
+const { currentPage, totalPages, baseUrl, queryParam = false } = Astro.props;
 
 /**
  * Generates an array of page numbers to display with ellipsis
@@ -84,7 +87,8 @@ const pageNumbers = getPageNumbers(currentPage, totalPages);
  * @returns Full URL path for the page
  */
 function getPageUrl(page: number): string {
-  return page === 1 ? baseUrl : `${baseUrl}/${page}`;
+  if (page === 1) return baseUrl;
+  return queryParam ? `${baseUrl}?page=${page}` : `${baseUrl}/${page}`;
 }
 ---
 

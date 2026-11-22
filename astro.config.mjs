@@ -217,5 +217,11 @@ export default defineConfig({
     "/projects/metaballs": "/metaballs/index.html",
     "/projects/metaballs/gallery": "/metaballs/gallery.html",
     "/projects/sailing": "/sailing/index.html",
+    // Old static pagination; the writing index now paginates via ?page=N
+    "/writing/2": "/writing?page=2",
+    "/writing/3": "/writing?page=3",
+    "/writing/4": "/writing?page=4",
+    "/writing/5": "/writing?page=5",
+    "/writing/6": "/writing?page=6",
   },
 });

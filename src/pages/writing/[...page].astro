@@ -1,25 +1,11 @@
 ---
 /**
- * Writing Index Page with Pagination
- * 
- * Lists all published articles (excluding drafts) with pagination support. Displays
- * article cards with title, description, publish date, and tags. Uses a rest parameter
- * route to handle both the first page (/writing) and subsequent pages (/writing/2, etc.).
- * 
- * Features:
- * - Filters out draft articles (only shows published content)
- * - Sorts by publish date (descending - newest first)
- * - Pagination with 5 articles per page
- * - Dynamic page statistics showing current range
- * - SEO optimization per page
- * - Empty state handling
- * 
- * Routes:
- * - /writing (page 1)
- * - /writing/2 (page 2)
- * - /writing/3 (page 3)
- * - etc.
- * 
+ * Writing Index Page
+ *
+ * Lists all published content (articles and notes) with client-side filtering
+ * and pagination. Renders all items in the DOM and uses JavaScript to handle
+ * filter-aware pagination via query parameters (?filter=note&page=2).
+ *
  * @page
  */
 
@@ -32,98 +18,48 @@ import { getCollection } from 'astro:content';
 import { pagesConfig } from '../../pages.config';
 import type { GetStaticPaths } from 'astro';
 
-/**
- * Generates static paths for all paginated pages
- *
- * Queries published content (draft: false), sorts by date, and creates
- * pagination paths. Page 1 uses undefined param to match /writing route,
- * while subsequent pages use numeric params (/writing/2, /writing/3, etc.).
- * All content (notes and posts) is loaded for client-side filtering.
- *
- * @returns Array of path objects with params and props for each page
- */
 export const getStaticPaths: GetStaticPaths = async () => {
-  const postsPerPage = 5;
-
   const allContent = await getCollection('writing', ({ data }) => {
     return data.draft === false;
   });
 
-  // Sort by publishDate (descending - most recent first)
   const sortedContent = allContent.sort((a, b) => {
     return b.data.publishDate.getTime() - a.data.publishDate.getTime();
   });
 
-  // Calculate counts for all content (for filter stats)
   const allCount = sortedContent.length;
   const postsCount = sortedContent.filter(item => item.data.type.includes('post')).length;
   const notesCount = sortedContent.filter(item => item.data.type.includes('note')).length;
 
-  const totalPages = Math.ceil(sortedContent.length / postsPerPage);
-
-  return Array.from({ length: totalPages }, (_, i) => {
-    const page = i + 1;
-    const start = i * postsPerPage;
-    const end = start + postsPerPage;
-
-    return {
-      params: { page: page === 1 ? undefined : String(page) },
-      props: {
-        content: sortedContent.slice(start, end),
-        currentPage: page,
-        totalPages,
-        totalContent: sortedContent.length,
-        allCount,
-        postsCount,
-        notesCount,
-      },
-    };
-  });
+  return [{
+    params: { page: undefined },
+    props: {
+      content: sortedContent,
+      allCount,
+      postsCount,
+      notesCount,
+    },
+  }];
 };
 
 interface Props {
-  /** Content for the current page (both notes and posts) */
   content: Awaited<ReturnType<typeof getCollection<'writing'>>>;
-
-  /** Current page number (1-indexed) */
-  currentPage: number;
-
-  /** Total number of pages */
-  totalPages: number;
-
-  /** Total count of all published content */
-  totalContent: number;
-
-  /** Total count of all items */
   allCount: number;
-
-  /** Total count of all articles */
   postsCount: number;
-
-  /** Total count of all notes */
   notesCount: number;
 }
 
-const { content, currentPage, totalPages, totalContent, allCount, postsCount, notesCount } = Astro.props;
-const postsPerPage = 5;
-
-// Get filter from URL parameters
+const { content, allCount, postsCount, notesCount } = Astro.props;
+const ITEMS_PER_PAGE = 5;
 const currentFilter = new URLSearchParams(Astro.url.search).get('filter') || 'all';
-
-/**
- * Generates page title based on current page number
- *
- * Page 1 shows the main title, subsequent pages include page number.
- */
-const pageTitle = currentPage === 1
-  ? pagesConfig.writing.title
-  : `${pagesConfig.writing.title} - Page ${currentPage}`;
+const currentPage = parseInt(new URLSearchParams(Astro.url.search).get('page') || '1');
+const totalPages = Math.ceil(allCount / ITEMS_PER_PAGE);
 ---
 
 <BaseLayout>
-  <SEO 
+  <SEO
     slot="head"
-    title={pageTitle}
+    title={pagesConfig.writing.title}
     description={pagesConfig.writing.description}
     type="website"
   />
@@ -135,7 +71,6 @@ const pageTitle = currentPage === 1
         {pagesConfig.writing.intro}
       </p>
 
-      <!-- Filter Tabs -->
       <div class="filter-tabs">
         <button
           class={currentFilter === 'all' ? 'active' : ''}
@@ -163,13 +98,9 @@ const pageTitle = currentPage === 1
         </button>
       </div>
 
-      <PageStats text={totalPages > 1
-        ? `Showing ${(currentPage - 1) * postsPerPage + 1}–${Math.min(currentPage * postsPerPage, totalContent)} of ${totalContent} items`
-        : `${totalContent} items`
-      } id="page-stats" />
+      <PageStats text={`${allCount} items`} id="page-stats" />
     </header>
 
-    <!-- Store filter counts for JavaScript -->
     <div id="filter-counts" style="display: none;"
       data-all-count={allCount}
       data-posts-count={postsCount}
@@ -194,11 +125,14 @@ const pageTitle = currentPage === 1
       <p class="empty-state">No content published yet.</p>
     )}
 
-    <Pagination
-      currentPage={currentPage}
-      totalPages={totalPages}
-      baseUrl="/writing"
-    />
+    <div id="pagination-container">
+      <Pagination
+        currentPage={currentPage}
+        totalPages={totalPages}
+        baseUrl="/writing"
+        queryParam
+      />
+    </div>
   </main>
 
   <script>
@@ -208,72 +142,175 @@ const pageTitle = currentPage === 1
       }
     }
 
-    const filterState = (new URLSearchParams(window.location.search).get('filter') || 'all') as 'all' | 'post' | 'note';
-    let currentFilter = filterState;
+    const ITEMS_PER_PAGE = 5;
+    const initialFilter = (new URLSearchParams(window.location.search).get('filter') || 'all') as 'all' | 'post' | 'note';
 
-    function setFilter(filter: 'all' | 'post' | 'note') {
-      currentFilter = filter;
-      const url = new URL(window.location.href);
-      url.searchParams.set('filter', filter);
-      window.history.pushState({}, '', url.toString());
-      updateActiveButton(filter);
-      updateCardVisibility(filter);
-      updatePageStats(filter);
-    }
-
-    function updateActiveButton(filter: 'all' | 'post' | 'note') {
-      document.querySelectorAll('.filter-tabs button').forEach((btn) => {
-        const typedBtn = btn as HTMLElement;
-        typedBtn.classList.toggle('active', typedBtn.dataset.filter === filter);
+    function getFilteredCards(filter: string): HTMLElement[] {
+      const result: HTMLElement[] = [];
+      document.querySelectorAll('.card-item').forEach((card) => {
+        const types = (card as HTMLElement).dataset.type || '';
+        if (filter === 'all' || types.includes(filter)) {
+          result.push(card as HTMLElement);
+        }
       });
+      return result;
     }
 
-    function updateCardVisibility(filter: 'all' | 'post' | 'note') {
-      const cards = document.querySelectorAll('.card-item');
-      cards.forEach((card) => {
-        const typedCard = card as HTMLElement;
-        const types = typedCard.dataset.type || '';
-        const shouldShow =
-          filter === 'all' || types.includes(filter);
-        typedCard.style.display = shouldShow ? 'block' : 'none';
+    function applyPage(filter: string, page: number, history: 'push' | 'replace') {
+      const cards = getFilteredCards(filter);
+      const totalItems = cards.length;
+      const totalPages = Math.max(1, Math.ceil(totalItems / ITEMS_PER_PAGE));
+      const safePage = Math.max(1, Math.min(page, totalPages));
+      const start = (safePage - 1) * ITEMS_PER_PAGE;
+      const end = start + ITEMS_PER_PAGE;
+
+      document.querySelectorAll('.card-item').forEach((card) => {
+        (card as HTMLElement).style.display = 'none';
       });
-    }
-
-    function updatePageStats(filter: 'all' | 'post' | 'note') {
-      const countsContainer = document.getElementById('filter-counts');
-      if (!countsContainer) return;
-
-      const totalCount = filter === 'all' ?
-        countsContainer.dataset.allCount :
-        filter === 'post' ?
-        countsContainer.dataset.postsCount :
-        countsContainer.dataset.notesCount;
+      cards.forEach((card, i) => {
+        card.style.display = i >= start && i < end ? 'block' : 'none';
+      });
 
       const statsElement = document.getElementById('page-stats');
       if (statsElement) {
-        const statsText = statsElement.textContent || '';
-        const match = statsText.match(/of \d+ items/);
-        if (match) {
-          const newStats = statsText.replace(/\d+ items/g, `${totalCount} items`);
-          statsElement.textContent = newStats;
+        if (totalPages > 1) {
+          statsElement.textContent = `Showing ${start + 1}\u2013${Math.min(end, totalItems)} of ${totalItems} items`;
+        } else {
+          statsElement.textContent = `${totalItems} item${totalItems !== 1 ? 's' : ''}`;
         }
+      }
+
+      const url = new URL(window.location.href);
+      if (filter !== 'all') url.searchParams.set('filter', filter);
+      else url.searchParams.delete('filter');
+      if (safePage > 1) url.searchParams.set('page', String(safePage));
+      else url.searchParams.delete('page');
+      if (url.href !== window.location.href) {
+        if (history === 'push') window.history.pushState(null, '', url.href);
+        else window.history.replaceState(window.history.state, '', url.href);
       }
     }
 
-    // Initialize on page load
-    document.addEventListener('DOMContentLoaded', () => {
-      updateActiveButton(currentFilter);
-      updateCardVisibility(currentFilter);
-      updatePageStats(currentFilter);
+    function updatePagination(filter: string, page: number) {
+      const container = document.getElementById('pagination-container');
+      if (!container) return;
 
-      // Listen for back/forward navigation
-      window.addEventListener('popstate', () => {
-        const newFilter = (new URLSearchParams(window.location.search).get('filter') || 'all') as 'all' | 'post' | 'note';
-        currentFilter = newFilter;
-        updateActiveButton(newFilter);
-        updateCardVisibility(newFilter);
-        updatePageStats(newFilter);
+      const cards = getFilteredCards(filter);
+      const totalItems = cards.length;
+      const totalPages = Math.max(1, Math.ceil(totalItems / ITEMS_PER_PAGE));
+      const safePage = Math.max(1, Math.min(page, totalPages));
+
+      if (totalPages <= 1) {
+        container.innerHTML = '';
+        return;
+      }
+
+      function getPageNumbers(current: number, total: number): (number | string)[] {
+        if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+        if (current <= 3) return [1, 2, 3, 4, '...', total];
+        if (current >= total - 2) return [1, '...', total - 3, total - 2, total - 1, total];
+        return [1, '...', current - 1, current, current + 1, '...', total];
+      }
+
+      function pageUrl(p: number): string {
+        const params = new URLSearchParams();
+        if (filter !== 'all') params.set('filter', filter);
+        if (p > 1) params.set('page', String(p));
+        const qs = params.toString();
+        return `/writing${qs ? '?' + qs : ''}`;
+      }
+
+      const pageNumbers = getPageNumbers(safePage, totalPages);
+      const prevSvg = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>';
+      const nextSvg = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>';
+
+      let html = '<nav class="pagination" aria-label="Pagination">';
+
+      if (safePage > 1) {
+        html += `<a href="${pageUrl(safePage - 1)}" class="pagination-btn pagination-prev" aria-label="Previous page">${prevSvg}<span>Previous</span></a>`;
+      } else {
+        html += `<span class="pagination-btn pagination-prev disabled" aria-disabled="true">${prevSvg}<span>Previous</span></span>`;
+      }
+
+      html += '<div class="pagination-numbers">';
+      for (const p of pageNumbers) {
+        if (p === '...') {
+          html += '<span class="pagination-ellipsis">...</span>';
+        } else {
+          const active = p === safePage ? ' active' : '';
+          const ariaCurrent = p === safePage ? ' aria-current="page"' : '';
+          html += `<a href="${pageUrl(p as number)}" class="pagination-number${active}"${ariaCurrent}>${p}</a>`;
+        }
+      }
+      html += '</div>';
+
+      if (safePage < totalPages) {
+        html += `<a href="${pageUrl(safePage + 1)}" class="pagination-btn pagination-next" aria-label="Next page"><span>Next</span>${nextSvg}</a>`;
+      } else {
+        html += `<span class="pagination-btn pagination-next disabled" aria-disabled="true"><span>Next</span>${nextSvg}</span>`;
+      }
+
+      html += '</nav>';
+      container.innerHTML = html;
+    }
+
+    type Filter = 'all' | 'post' | 'note';
+    let currentFilter: Filter = initialFilter;
+    let currentPage = 1;
+
+    function readUrl(): { filter: Filter; page: number } {
+      const params = new URLSearchParams(window.location.search);
+      const filter = params.get('filter');
+      const page = parseInt(params.get('page') || '1', 10);
+      return {
+        filter: filter === 'post' || filter === 'note' ? filter : 'all',
+        page: Number.isFinite(page) && page > 0 ? page : 1,
+      };
+    }
+
+    function render(filter: Filter, page: number, history: 'push' | 'replace') {
+      currentFilter = filter;
+      currentPage = page;
+      updateActiveButton(filter);
+      applyPage(filter, page, history);
+      updatePagination(filter, page);
+    }
+
+    function setFilter(filter: Filter) {
+      if (filter === currentFilter && currentPage === 1) return;
+      render(filter, 1, 'push');
+    }
+
+    function updateActiveButton(filter: string) {
+      document.querySelectorAll('.filter-tabs button').forEach((btn) => {
+        (btn as HTMLElement).classList.toggle('active', (btn as HTMLElement).dataset.filter === filter);
       });
+    }
+
+    const isWritingIndex = () => document.getElementById('card-list') !== null;
+
+    // astro:page-load fires on first load and after every ClientRouter navigation
+    document.addEventListener('astro:page-load', () => {
+      if (!isWritingIndex()) return;
+      const { filter, page } = readUrl();
+      render(filter, page, 'replace');
+    });
+
+    // Paginate in place instead of letting the router reload the page
+    document.addEventListener('click', (e) => {
+      const link = (e.target as Element).closest('#pagination-container a') as HTMLAnchorElement | null;
+      if (!link || e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      e.preventDefault();
+      const page = parseInt(new URL(link.href).searchParams.get('page') || '1', 10);
+      render(currentFilter, page, 'push');
+      document.getElementById('card-list')?.scrollIntoView({ block: 'start' });
+    }, true);
+
+    // Our history entries use a null state, which the ClientRouter ignores
+    window.addEventListener('popstate', () => {
+      if (!isWritingIndex()) return;
+      const { filter, page } = readUrl();
+      render(filter, page, 'replace');
     });
 
     window.setFilter = setFilter;
@@ -353,6 +390,78 @@ const pageTitle = currentPage === 1
       font-size: 1.125rem;
     }
 
+    .pagination {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      margin-top: 3rem;
+      padding-top: 2rem;
+      border-top: 1px solid var(--color-border);
+    }
+
+    .pagination-btn {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 1rem;
+      font-size: 0.875rem;
+      font-weight: 500;
+      color: var(--color-text);
+      text-decoration: none;
+      border: 1px solid var(--color-border);
+      border-radius: 6px;
+      transition: all 0.2s ease;
+    }
+
+    .pagination-btn:hover:not(.disabled) {
+      border-color: var(--color-accent);
+      color: var(--color-accent);
+    }
+
+    .pagination-btn.disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    .pagination-numbers {
+      display: flex;
+      align-items: center;
+      gap: 0.25rem;
+    }
+
+    .pagination-number {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 2.25rem;
+      height: 2.25rem;
+      font-size: 0.875rem;
+      font-weight: 500;
+      color: var(--color-text);
+      text-decoration: none;
+      border-radius: 6px;
+      transition: all 0.2s ease;
+    }
+
+    .pagination-number:hover:not(.active) {
+      background: var(--color-bg-secondary);
+    }
+
+    .pagination-number.active {
+      background: var(--color-accent);
+      color: var(--color-bg);
+    }
+
+    .pagination-ellipsis {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 2.25rem;
+      height: 2.25rem;
+      color: var(--color-text-secondary);
+    }
+
     @media (max-width: 768px) {
       .page-container {
         padding: 3rem 1rem;
@@ -364,6 +473,25 @@ const pageTitle = currentPage === 1
 
       .page-intro {
         font-size: 1rem;
+      }
+
+      .pagination {
+        flex-wrap: wrap;
+        gap: 0.75rem;
+      }
+
+      .pagination-btn span {
+        display: none;
+      }
+
+      .pagination-btn {
+        padding: 0.5rem 0.75rem;
+      }
+
+      .pagination-numbers {
+        order: -1;
+        width: 100%;
+        justify-content: center;
       }
     }
   </style>
